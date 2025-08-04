@@ -1,0 +1,33 @@
+{
+  "css.validate": false,
+  "less.validate": false,
+  "scss.validate": false,
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+  "tailwindCSS.includeLanguages": {
+    "javascript": "javascript",
+    "typescript": "typescript",
+    "javascriptreact": "javascript",
+    "typescriptreact": "typescript",
+    "html": "html",
+    "vue": "vue"
+  },
+  "tailwindCSS.emmetCompletions": true,
+  "tailwindCSS.cssNavigation": true,
+  "tailwindCSS.classAttributes": [
+    "class",
+    "className",
+    "ngClass",
+    "ng-container",
+    "ngTemplate"
+  ],
+  "tailwindCSS.experimental.classRegex": [
+    "class ?= ?\"([^\"]*)",
+    "class ?= ?'([^']*)",
+    "className ?= ?\"([^\"]*)",
+    "className ?= ?'([^']*)",
+    "tw ?= ?\"([^\"]*)",
+    "tw ?= ?'([^']*)"
+  ]
+}
