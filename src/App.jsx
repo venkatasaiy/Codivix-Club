@@ -1,11 +1,33 @@
 import React, { useState, useEffect, useContext, createContext } from 'react';
 
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+
+// Your web app's Firebase configuration
+// This is safe to include in client-side code
+const firebaseConfig = {
+  apiKey: "AIzaSyBZrglM9-lsraWWfiNam5znMGlwbGp1SiI",
+  authDomain: "codivixclub.firebaseapp.com",
+  projectId: "codivixclub",
+  storageBucket: "codivixclub.firebasestorage.app",
+  messagingSenderId: "850201515528",
+  appId: "1:850201515528:web:b8fd428bd4dff976c963bd",
+  measurementId: "G-7RC1PVBBW2"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const db = getFirestore(app);
+
 // Contexts
 const AuthContext = createContext();
 const DataContext = createContext();
 const ThemeContext = createContext();
 
-// Data Provider - Handles all data persistence
+// Data Provider - Handles all data persistence with Firebase
 const DataProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
@@ -14,189 +36,233 @@ const DataProvider = ({ children }) => {
   const [coordinators, setCoordinators] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load data from localStorage on initial load
+  // Set up real-time listeners for all collections
   useEffect(() => {
-    const loadData = () => {
-      try {
-        const storedEvents = localStorage.getItem('codvix_events');
-        const storedUsers = localStorage.getItem('codvix_users');
-        const storedRegistrations = localStorage.getItem('codvix_registrations');
-        const storedAnnouncements = localStorage.getItem('codvix_announcements');
-        const storedCoordinators = localStorage.getItem('codvix_coordinators');
-        const storedCertificates = localStorage.getItem('codvix_certificates');
-        const storedActivityLogs = localStorage.getItem('codvix_activity_logs');
+    const unsubscribeEvents = onSnapshot(collection(db, 'events'), (snapshot) => {
+      const eventData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setEvents(eventData);
+    });
 
-        if (storedEvents) setEvents(JSON.parse(storedEvents));
-        if (storedUsers) setUsers(JSON.parse(storedUsers));
-        if (storedRegistrations) setRegistrations(JSON.parse(storedRegistrations));
-        if (storedAnnouncements) setAnnouncements(JSON.parse(storedAnnouncements));
-        if (storedCoordinators) setCoordinators(JSON.parse(storedCoordinators));
-        if (storedCertificates) setCertificates(JSON.parse(storedCertificates));
-        if (storedActivityLogs) setActivityLogs(JSON.parse(storedActivityLogs));
+    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const userData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUsers(userData);
+    });
 
-        // Initialize with sample data if empty
-        if (!storedEvents) {
-          const initialEvents = [
-            {
-              id: 1,
-              title: "Hackathon",
-              description: "A 24-hour coding marathon to build innovative solutions using AI and ML.",
-              date: "2024-07-15",
-              time: "10:00 AM",
-              venue: "Main Auditorium",
-              category: "Coding",
-              image: "https://placehold.co/400x250/3b82f6/ffffff?text=Hackathon",
-              teamSize: "1-4",
-              price: 150,
-              maxParticipants: 100,
-              registeredCount: 42,
-              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample1/viewform"
-            },
-            {
-              id: 2,
-              title: "AI Workshop",
-              description: "Hands-on session on building neural networks and deep learning models.",
-              date: "2024-07-18",
-              time: "2:00 PM",
-              venue: "AI Lab, Block C",
-              category: "Workshop",
-              image: "https://placehold.co/400x250/10b981/ffffff?text=AI+Workshop",
-              teamSize: "1",
-              price: 200,
-              maxParticipants: 50,
-              registeredCount: 28,
-              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample2/viewform"
-            },
-            {
-              id: 3,
-              title: "Tech Quiz",
-              description: "Test your knowledge in computer science, algorithms, and tech history.",
-              date: "2024-07-20",
-              time: "11:00 AM",
-              venue: "Seminar Hall",
-              category: "Competition",
-              image: "https://placehold.co/400x250/f59e0b/ffffff?text=Tech+Quiz",
-              teamSize: "1-2",
-              price: 100,
-              maxParticipants: 80,
-              registeredCount: 67,
-              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample3/viewform"
-            }
-          ];
-          setEvents(initialEvents);
-          localStorage.setItem('codvix_events', JSON.stringify(initialEvents));
+    const unsubscribeRegistrations = onSnapshot(collection(db, 'registrations'), (snapshot) => {
+      const registrationData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRegistrations(registrationData);
+    });
+
+    const unsubscribeAnnouncements = onSnapshot(collection(db, 'announcements'), (snapshot) => {
+      const announcementData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setAnnouncements(announcementData);
+    });
+
+    const unsubscribeCoordinators = onSnapshot(collection(db, 'coordinators'), (snapshot) => {
+      const coordinatorData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setCoordinators(coordinatorData);
+    });
+
+    const unsubscribeCertificates = onSnapshot(collection(db, 'certificates'), (snapshot) => {
+      const certificateData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setCertificates(certificateData);
+    });
+
+    const unsubscribeActivityLogs = onSnapshot(collection(db, 'activityLogs'), (snapshot) => {
+      const logData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setActivityLogs(logData);
+    });
+
+    // Initialize with sample data if empty
+    const initializeData = async () => {
+      const eventsSnapshot = await getDocs(collection(db, 'events'));
+      if (eventsSnapshot.empty) {
+        const initialEvents = [
+          {
+            title: "Hackathon",
+            description: "A 24-hour coding marathon to build innovative solutions using AI and ML.",
+            date: "2024-07-15",
+            time: "10:00 AM",
+            venue: "Main Auditorium",
+            category: "Coding",
+            image: "https://placehold.co/400x250/3b82f6/ffffff?text=Hackathon",
+            teamSize: "1-4",
+            price: 150,
+            maxParticipants: 100,
+            registeredCount: 42,
+            googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample1/viewform"
+          },
+          {
+            title: "AI Workshop",
+            description: "Hands-on session on building neural networks and deep learning models.",
+            date: "2024-07-18",
+            time: "2:00 PM",
+            venue: "AI Lab, Block C",
+            category: "Workshop",
+            image: "https://placehold.co/400x250/10b981/ffffff?text=AI+Workshop",
+            teamSize: "1",
+            price: 200,
+            maxParticipants: 50,
+            registeredCount: 28,
+            googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample2/viewform"
+          },
+          {
+            title: "Tech Quiz",
+            description: "Test your knowledge in computer science, algorithms, and tech history.",
+            date: "2024-07-20",
+            time: "11:00 AM",
+            venue: "Seminar Hall",
+            category: "Competition",
+            image: "https://placehold.co/400x250/f59e0b/ffffff?text=Tech+Quiz",
+            teamSize: "1-2",
+            price: 100,
+            maxParticipants: 80,
+            registeredCount: 67,
+            googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample3/viewform"
+          }
+        ];
+        
+        for (const event of initialEvents) {
+          await addDoc(collection(db, 'events'), event);
         }
+      }
 
-        if (!storedCoordinators) {
-          const initialCoordinators = [
-            {
-              id: 1,
-              name: "Dr. Anjali Sharma",
-              department: "AI & ML",
-              role: "Event Head",
-              phone: "+91 9876543210",
-              email: "anjali.sharma@college.edu",
-              photo: "https://placehold.co/150x150/d946ef/ffffff?text=AS"
-            },
-            {
-              id: 2,
-              name: "Rahul Verma",
-              department: "Computer Science",
-              role: "Technical Coordinator",
-              phone: "+91 8765432109",
-              email: "rahul.verma@college.edu",
-              photo: "https://placehold.co/150x150/06b6d4/ffffff?text=RV"
-            }
-          ];
-          setCoordinators(initialCoordinators);
-          localStorage.setItem('codvix_coordinators', JSON.stringify(initialCoordinators));
+      const coordinatorsSnapshot = await getDocs(collection(db, 'coordinators'));
+      if (coordinatorsSnapshot.empty) {
+        const initialCoordinators = [
+          {
+            name: "Dr. Anjali Sharma",
+            department: "AI & ML",
+            role: "Event Head",
+            phone: "+91 9876543210",
+            email: "anjali.sharma@college.edu",
+            photo: "https://placehold.co/150x150/d946ef/ffffff?text=AS"
+          },
+          {
+            name: "Rahul Verma",
+            department: "Computer Science",
+            role: "Technical Coordinator",
+            phone: "+91 8765432109",
+            email: "rahul.verma@college.edu",
+            photo: "https://placehold.co/150x150/06b6d4/ffffff?text=RV"
+          }
+        ];
+        
+        for (const coordinator of initialCoordinators) {
+          await addDoc(collection(db, 'coordinators'), coordinator);
         }
+      }
 
-        if (!storedAnnouncements) {
-          const initialAnnouncements = [
-            { id: 1, message: "Venue for AI Workshop changed to AI Lab, Block C.", urgent: false, date: "2024-06-08" }
-          ];
-          setAnnouncements(initialAnnouncements);
-          localStorage.setItem('codvix_announcements', JSON.stringify(initialAnnouncements));
-        }
-      } catch (error) {
-        console.error('Error loading ', error);
+      const announcementsSnapshot = await getDocs(collection(db, 'announcements'));
+      if (announcementsSnapshot.empty) {
+        await addDoc(collection(db, 'announcements'), {
+          message: "Venue for AI Workshop changed to AI Lab, Block C.",
+          urgent: false,
+          date: "2024-06-08"
+        });
+      }
+
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      if (usersSnapshot.empty) {
+        await addDoc(collection(db, 'users'), {
+          name: "Admin User",
+          email: "admin@college.edu",
+          password: "admin123",
+          role: "admin",
+          createdAt: new Date().toISOString(),
+          lastLogin: null
+        });
       }
     };
 
-    loadData();
+    initializeData();
+    setLoading(false);
+
+    // Cleanup function
+    return () => {
+      unsubscribeEvents();
+      unsubscribeUsers();
+      unsubscribeRegistrations();
+      unsubscribeAnnouncements();
+      unsubscribeCoordinators();
+      unsubscribeCertificates();
+      unsubscribeActivityLogs();
+    };
   }, []);
 
-  // Save data to localStorage whenever it changes
-  useEffect(() => {
-    if (events.length > 0) localStorage.setItem('codvix_events', JSON.stringify(events));
-  }, [events]);
-
-  useEffect(() => {
-    if (users.length > 0) localStorage.setItem('codvix_users', JSON.stringify(users));
-  }, [users]);
-
-  useEffect(() => {
-    if (registrations.length > 0) localStorage.setItem('codvix_registrations', JSON.stringify(registrations));
-  }, [registrations]);
-
-  useEffect(() => {
-    if (announcements.length > 0) localStorage.setItem('codvix_announcements', JSON.stringify(announcements));
-  }, [announcements]);
-
-  useEffect(() => {
-    if (coordinators.length > 0) localStorage.setItem('codvix_coordinators', JSON.stringify(coordinators));
-  }, [coordinators]);
-
-  useEffect(() => {
-    if (certificates.length > 0) localStorage.setItem('codvix_certificates', JSON.stringify(certificates));
-  }, [certificates]);
-
-  useEffect(() => {
-    if (activityLogs.length > 0) localStorage.setItem('codvix_activity_logs', JSON.stringify(activityLogs));
-  }, [activityLogs]);
-
   // Helper functions for data operations
-  const addActivityLog = (action, userId, details = {}) => {
-    const newLog = {
-      id: Date.now(),
-      timestamp: new Date().toISOString(),
-      action,
-      userId,
-      details
-    };
-    setActivityLogs(prev => [...prev, newLog]);
+  const addActivityLog = async (action, userId, details = {}) => {
+    try {
+      await addDoc(collection(db, 'activityLogs'), {
+        timestamp: new Date().toISOString(),
+        action,
+        userId,
+        details
+      });
+    } catch (error) {
+      console.error('Error adding activity log:', error);
+    }
   };
 
-  const createUser = (userData) => {
-    const newUser = {
-      id: Date.now(),
-      ...userData,
-      createdAt: new Date().toISOString(),
-      lastLogin: null
-    };
-    setUsers(prev => [...prev, newUser]);
-    addActivityLog('user_registered', newUser.id, { email: userData.email });
-    return newUser;
+  const createUser = async (userData) => {
+    try {
+      const newUser = {
+        ...userData,
+        createdAt: new Date().toISOString(),
+        lastLogin: null
+      };
+      
+      const docRef = await addDoc(collection(db, 'users'), newUser);
+      const createdUser = { id: docRef.id, ...newUser };
+      
+      addActivityLog('user_registered', docRef.id, { email: userData.email });
+      return createdUser;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
   };
 
   const findUser = (email) => {
     return users.find(user => user.email === email);
   };
 
-  const updateUserLastLogin = (userId) => {
-    setUsers(prev => 
-      prev.map(user => 
-        user.id === userId 
-          ? { ...user, lastLogin: new Date().toISOString() }
-          : user
-      )
-    );
-    addActivityLog('user_login', userId);
+  const updateUserLastLogin = async (userId) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        lastLogin: new Date().toISOString()
+      });
+      addActivityLog('user_login', userId);
+    } catch (error) {
+      console.error('Error updating last login:', error);
+    }
   };
 
-  const registerForEvent = (userId, eventId, registrationData) => {
+  const registerForEvent = async (userId, eventId, registrationData) => {
     // Check if already registered
     const existingRegistration = registrations.find(
       reg => reg.userId === userId && reg.eventId === eventId
@@ -212,29 +278,31 @@ const DataProvider = ({ children }) => {
       throw new Error('This event is full');
     }
 
-    const newRegistration = {
-      id: Date.now(),
-      userId,
-      eventId,
-      ...registrationData,
-      registeredAt: new Date().toISOString(),
-      status: 'pending',
-      paymentStatus: 'unpaid'
-    };
+    try {
+      const newRegistration = {
+        userId,
+        eventId,
+        ...registrationData,
+        registeredAt: new Date().toISOString(),
+        status: 'pending',
+        paymentStatus: 'unpaid'
+      };
 
-    setRegistrations(prev => [...prev, newRegistration]);
-    
-    // Update event registration count
-    setEvents(prev => 
-      prev.map(event => 
-        event.id === eventId 
-          ? { ...event, registeredCount: event.registeredCount + 1 }
-          : event
-      )
-    );
+      const docRef = await addDoc(collection(db, 'registrations'), newRegistration);
+      
+      // Update event registration count
+      const eventRef = doc(db, 'events', eventId);
+      await updateDoc(eventRef, {
+        registeredCount: event.registeredCount + 1
+      });
 
-    addActivityLog('event_registration', userId, { eventId, registrationData });
-    return newRegistration;
+      addActivityLog('event_registration', userId, { eventId, registrationData });
+      
+      return { id: docRef.id, ...newRegistration };
+    } catch (error) {
+      console.error('Error registering for event:', error);
+      throw error;
+    }
   };
 
   const getUserRegistrations = (userId) => {
@@ -255,78 +323,122 @@ const DataProvider = ({ children }) => {
     activityLogs
   });
 
-  const addEvent = (eventData) => {
-    const newEvent = {
-      id: Date.now(),
-      ...eventData,
-      registeredCount: 0
-    };
-    setEvents(prev => [...prev, newEvent]);
-    addActivityLog('event_created', null, { eventId: newEvent.id, title: eventData.title });
-    return newEvent;
+  const addEvent = async (eventData) => {
+    try {
+      const newEventData = {
+        ...eventData,
+        registeredCount: 0
+      };
+
+      const docRef = await addDoc(collection(db, 'events'), newEventData);
+      const createdEvent = { id: docRef.id, ...newEventData };
+      
+      addActivityLog('event_created', null, { eventId: docRef.id, title: eventData.title });
+      return createdEvent;
+    } catch (error) {
+      console.error('Error adding event:', error);
+      throw error;
+    }
   };
 
-  const updateEvent = (eventId, eventData) => {
-    setEvents(prev => 
-      prev.map(event => 
-        event.id === eventId ? { ...event, ...eventData } : event
-      )
-    );
-    addActivityLog('event_updated', null, { eventId, title: eventData.title });
+  const updateEvent = async (eventId, eventData) => {
+    try {
+      const eventRef = doc(db, 'events', eventId);
+      await updateDoc(eventRef, eventData);
+      addActivityLog('event_updated', null, { eventId, title: eventData.title });
+    } catch (error) {
+      console.error('Error updating event:', error);
+      throw error;
+    }
   };
 
-  const deleteEvent = (eventId) => {
-    setEvents(prev => prev.filter(event => event.id !== eventId));
-    // Also delete related registrations
-    setRegistrations(prev => prev.filter(reg => reg.eventId !== eventId));
-    addActivityLog('event_deleted', null, { eventId });
+  const deleteEvent = async (eventId) => {
+    try {
+      // Delete the event
+      await deleteDoc(doc(db, 'events', eventId));
+      
+      // Delete related registrations
+      const registrationsToDelete = registrations.filter(reg => reg.eventId === eventId);
+      for (const reg of registrationsToDelete) {
+        await deleteDoc(doc(db, 'registrations', reg.id));
+      }
+      
+      addActivityLog('event_deleted', null, { eventId });
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      throw error;
+    }
   };
 
-  const addAnnouncement = (announcementData) => {
-    const newAnnouncement = {
-      id: Date.now(),
-      ...announcementData,
-      date: new Date().toISOString()
-    };
-    setAnnouncements(prev => [newAnnouncement, ...prev]);
-    addActivityLog('announcement_added', null, { message: announcementData.message });
-    return newAnnouncement;
+  const addAnnouncement = async (announcementData) => {
+    try {
+      const newAnnouncement = {
+        ...announcementData,
+        date: new Date().toISOString()
+      };
+
+      const docRef = await addDoc(collection(db, 'announcements'), newAnnouncement);
+      const createdAnnouncement = { id: docRef.id, ...newAnnouncement };
+      
+      addActivityLog('announcement_added', null, { message: announcementData.message });
+      return createdAnnouncement;
+    } catch (error) {
+      console.error('Error adding announcement:', error);
+      throw error;
+    }
   };
 
-  const addCoordinator = (coordinatorData) => {
-    const newCoordinator = {
-      id: Date.now(),
-      ...coordinatorData
-    };
-    setCoordinators(prev => [...prev, newCoordinator]);
-    addActivityLog('coordinator_added', null, { name: coordinatorData.name });
-    return newCoordinator;
+  const addCoordinator = async (coordinatorData) => {
+    try {
+      const docRef = await addDoc(collection(db, 'coordinators'), coordinatorData);
+      const createdCoordinator = { id: docRef.id, ...coordinatorData };
+      
+      addActivityLog('coordinator_added', null, { name: coordinatorData.name });
+      return createdCoordinator;
+    } catch (error) {
+      console.error('Error adding coordinator:', error);
+      throw error;
+    }
   };
 
-  const updateCoordinator = (coordinatorId, coordinatorData) => {
-    setCoordinators(prev => 
-      prev.map(coord => 
-        coord.id === coordinatorId ? { ...coord, ...coordinatorData } : coord
-      )
-    );
-    addActivityLog('coordinator_updated', null, { coordinatorId, name: coordinatorData.name });
+  const updateCoordinator = async (coordinatorId, coordinatorData) => {
+    try {
+      const coordinatorRef = doc(db, 'coordinators', coordinatorId);
+      await updateDoc(coordinatorRef, coordinatorData);
+      addActivityLog('coordinator_updated', null, { coordinatorId, name: coordinatorData.name });
+    } catch (error) {
+      console.error('Error updating coordinator:', error);
+      throw error;
+    }
   };
 
-  const deleteCoordinator = (coordinatorId) => {
-    setCoordinators(prev => prev.filter(coord => coord.id !== coordinatorId));
-    addActivityLog('coordinator_deleted', null, { coordinatorId });
+  const deleteCoordinator = async (coordinatorId) => {
+    try {
+      await deleteDoc(doc(db, 'coordinators', coordinatorId));
+      addActivityLog('coordinator_deleted', null, { coordinatorId });
+    } catch (error) {
+      console.error('Error deleting coordinator:', error);
+      throw error;
+    }
   };
 
-  const issueCertificate = (certificateData) => {
-    const newCertificate = {
-      id: Date.now(),
-      ...certificateData,
-      issuedAt: new Date().toISOString(),
-      status: 'issued'
-    };
-    setCertificates(prev => [...prev, newCertificate]);
-    addActivityLog('certificate_issued', null, { userId: certificateData.userId, eventId: certificateData.eventId });
-    return newCertificate;
+  const issueCertificate = async (certificateData) => {
+    try {
+      const newCertificate = {
+        ...certificateData,
+        issuedAt: new Date().toISOString(),
+        status: 'issued'
+      };
+
+      const docRef = await addDoc(collection(db, 'certificates'), newCertificate);
+      const createdCertificate = { id: docRef.id, ...newCertificate };
+      
+      addActivityLog('certificate_issued', null, { userId: certificateData.userId, eventId: certificateData.eventId });
+      return createdCertificate;
+    } catch (error) {
+      console.error('Error issuing certificate:', error);
+      throw error;
+    }
   };
 
   const getUserCertificates = (userId) => {
@@ -357,7 +469,8 @@ const DataProvider = ({ children }) => {
     deleteCoordinator,
     issueCertificate,
     getUserCertificates,
-    addActivityLog
+    addActivityLog,
+    loading
   };
 
   return (
@@ -380,13 +493,13 @@ const AuthProvider = ({ children }) => {
         const userData = JSON.parse(savedUser);
         setUser(userData);
       } catch (e) {
-        console.error('Failed to parse user ', e);
+        console.error('Failed to parse user data:', e);
       }
     }
     setLoading(false);
   }, []);
 
-  const login = (email, password, secretCode = null) => {
+  const login = async (email, password, secretCode = null) => {
     const user = findUser(email);
     
     if (!user) {
@@ -395,7 +508,7 @@ const AuthProvider = ({ children }) => {
 
     // Admin login with secret code
     if (user.role === 'admin') {
-      if (password !== 'admin123' || secretCode !== 'CODVIX2024') {
+      if (password !== 'admin123' || secretCode !== 'CODIVIX2025') {
         throw new Error('Invalid admin credentials');
       }
     } else {
@@ -411,13 +524,13 @@ const AuthProvider = ({ children }) => {
     return user;
   };
 
-  const register = (userData) => {
+  const register = async (userData) => {
     // Check if email already exists
     if (findUser(userData.email)) {
       throw new Error('Email already registered');
     }
 
-    const newUser = createUser(userData);
+    const newUser = await createUser(userData);
     setUser(newUser);
     localStorage.setItem('codvix_current_user', JSON.stringify(newUser));
     return newUser;
@@ -428,15 +541,14 @@ const AuthProvider = ({ children }) => {
     localStorage.removeItem('codvix_current_user');
   };
 
-  const updateProfile = (updatedData) => {
+  const updateProfile = async (updatedData) => {
     const newUser = { ...user, ...updatedData };
     setUser(newUser);
     localStorage.setItem('codvix_current_user', JSON.stringify(newUser));
     
-    // Update in main users array
-    const { users } = useContext(DataContext);
-    const updatedUsers = users.map(u => u.id === user.id ? newUser : u);
-    localStorage.setItem('codvix_users', JSON.stringify(updatedUsers));
+    // Update in Firestore
+    const userRef = doc(db, 'users', user.id);
+    await updateDoc(userRef, updatedData);
     
     const { addActivityLog } = useContext(DataContext);
     addActivityLog('profile_updated', user.id, updatedData);
@@ -497,7 +609,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold">CODIVIX CLUB</h1>
+              <h1 className="text-2xl font-bold">CODVIX CLUB</h1>
             </div>
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
@@ -628,7 +740,7 @@ const HeroSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-              CODIVIX <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">CLUB</span>
+              CODVIX <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">CLUB</span>
             </h1>
             <p className="text-xl text-gray-700 dark:text-gray-300 mb-8">
               The premier tech event of the year, organized by the AI & ML Department. 
@@ -657,8 +769,8 @@ const HeroSection = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg transform rotate-6 opacity-20"></div>
             <img 
-              src="https://placehold.co/600x400/6366f1/ffffff?text=CODIVIX+Club" 
-              alt="CODIVIX Club" 
+              src="https://placehold.co/600x400/6366f1/ffffff?text=CODVIX+Club" 
+              alt="CODVIX Club" 
               className="relative rounded-lg shadow-2xl"
             />
           </div>
@@ -951,7 +1063,7 @@ const CoordinatorsSection = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">Event Coordinators</h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300">Meet the team behind CODIVIX CLUB</p>
+          <p className="text-xl text-gray-600 dark:text-gray-300">Meet the team behind CODVIX CLUB</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {coordinators.map((coordinator) => (
@@ -1114,7 +1226,6 @@ const LoginForm = () => {
                   )}
                 </div>
               </button>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Default: CODVIX2024</p>
             </div>
           )}
           <button
@@ -1215,7 +1326,7 @@ const RegisterForm = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 max-w-md w-full">
-      <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-6">Register for CODIVIX CLUB</h2>
+      <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-6">Register for CODVIX CLUB</h2>
       
       {error && (
         <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg text-sm">
@@ -1356,7 +1467,7 @@ const ProfileSection = () => {
     }
   }, [user]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSuccess('');
     
@@ -1368,19 +1479,20 @@ const ProfileSection = () => {
       return;
     }
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
       const updatedData = { name: formData.name, email: formData.email };
       if (formData.password) {
         // In real app, password would be handled securely
         updatedData.passwordChanged = true;
       }
       
-      updateProfile(updatedData);
+      await updateProfile(updatedData);
       setIsEditing(false);
       setSuccess('Profile updated successfully!');
       setTimeout(() => setSuccess(''), 3000);
-    }, 500);
+    } catch (error) {
+      setError('Failed to update profile');
+    }
   };
 
   const handleLogout = () => {
@@ -1580,9 +1692,19 @@ const AdminDashboard = () => {
       setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
       e.preventDefault();
-      onSave(formData);
+      try {
+        if (event) {
+          await updateEvent(event.id, formData);
+        } else {
+          await addEvent(formData);
+        }
+        setShowEventForm(false);
+        setEditingEvent(null);
+      } catch (error) {
+        console.error('Error saving event:', error);
+      }
     };
 
     return (
@@ -1751,9 +1873,19 @@ const AdminDashboard = () => {
       setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
       e.preventDefault();
-      onSave(formData);
+      try {
+        if (coordinator) {
+          await updateCoordinator(coordinator.id, formData);
+        } else {
+          await addCoordinator(formData);
+        }
+        setShowCoordinatorForm(false);
+        setEditingCoordinator(null);
+      } catch (error) {
+        console.error('Error saving coordinator:', error);
+      }
     };
 
     return (
@@ -1859,9 +1991,15 @@ const AdminDashboard = () => {
       }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
       e.preventDefault();
-      onSubmit(formData);
+      try {
+        await addAnnouncement(formData);
+        setShowAnnouncementForm(false);
+        setAnnouncementForm({ message: '', urgent: false });
+      } catch (error) {
+        console.error('Error adding announcement:', error);
+      }
     };
 
     return (
@@ -2361,7 +2499,7 @@ const AdminDashboard = () => {
                   <div className="flex">
                     <input
                       type="password"
-                      value="CODVIX2024"
+                      value="CODIVIX2025"
                       className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                       disabled
                     />
@@ -2444,7 +2582,7 @@ const App = () => {
         {!user && (
           <section className="py-20 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-blue-950">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-8">Join CODIVIX CLUB</h2>
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-8">Join CODVIX CLUB</h2>
               <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
                 Be part of the most exciting tech event of the year. Register now to participate in competitions, workshops, and exhibitions.
               </p>
@@ -2471,7 +2609,7 @@ const App = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
-              <h3 className="text-2xl font-bold mb-4">CODIVIX CLUB</h3>
+              <h3 className="text-2xl font-bold mb-4">CODVIX CLUB</h3>
               <p className="text-gray-300 mb-4">
                 The premier tech event organized by the AI & ML Department. Join us for an unforgettable experience 
                 filled with innovation, competition, and learning.
@@ -2509,13 +2647,13 @@ const App = () => {
                 <p>AI & ML Department</p>
                 <p>College of Engineering</p>
                 <p>City, State 12345</p>
-                <p>contact@codivix.edu</p>
+                <p>contact@codvix.edu</p>
                 <p>+91 1234567890</p>
               </div>
             </div>
           </div>
           <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; CODIVIX CLUB. All rights reserved. Organized by AI & ML Department.</p>
+            <p>&copy; CODVIX CLUB. All rights reserved. Organized by AI & ML Department.</p>
           </div>
         </div>
       </footer>
@@ -2525,7 +2663,7 @@ const App = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Login to CODIVIX CLUB</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Login to CODVIX CLUB</h3>
               <button
                 onClick={() => document.getElementById('login-modal').classList.add('hidden')}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -2545,7 +2683,7 @@ const App = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Register for CODIVIX CLUB</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Register for CODVIX CLUB</h3>
               <button
                 onClick={() => document.getElementById('register-modal').classList.add('hidden')}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
