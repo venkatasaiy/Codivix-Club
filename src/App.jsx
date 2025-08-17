@@ -39,200 +39,210 @@ const DataProvider = ({ children }) => {
 
   // Set up real-time listeners with proper error handling
   useEffect(() => {
-    const unsubscribeEvents = onSnapshot(
-      collection(db, 'events'),
-      (snapshot) => {
-        const eventData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setEvents(eventData);
-      },
-      (error) => {
-        console.error('Error listening to events:', error);
-      }
-    );
+    let unsubscribeEvents, unsubscribeRegistrations, unsubscribeAnnouncements, 
+        unsubscribeCoordinators, unsubscribeCertificates, unsubscribeActivityLogs;
 
-    const unsubscribeRegistrations = onSnapshot(
-      collection(db, 'registrations'),
-      (snapshot) => {
-        const registrationData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setRegistrations(registrationData);
-      },
-      (error) => {
-        console.error('Error listening to registrations:', error);
-      }
-    );
+    try {
+      // Set up all listeners
+      unsubscribeEvents = onSnapshot(
+        collection(db, 'events'),
+        (snapshot) => {
+          const eventData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setEvents(eventData);
+        },
+        (error) => {
+          console.error('Error listening to events:', error);
+        }
+      );
 
-    const unsubscribeAnnouncements = onSnapshot(
-      collection(db, 'announcements'),
-      (snapshot) => {
-        const announcementData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setAnnouncements(announcementData);
-      },
-      (error) => {
-        console.error('Error listening to announcements:', error);
-      }
-    );
+      unsubscribeRegistrations = onSnapshot(
+        collection(db, 'registrations'),
+        (snapshot) => {
+          const registrationData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setRegistrations(registrationData);
+        },
+        (error) => {
+          console.error('Error listening to registrations:', error);
+        }
+      );
 
-    const unsubscribeCoordinators = onSnapshot(
-      collection(db, 'coordinators'),
-      (snapshot) => {
-        const coordinatorData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setCoordinators(coordinatorData);
-      },
-      (error) => {
-        console.error('Error listening to coordinators:', error);
-      }
-    );
+      unsubscribeAnnouncements = onSnapshot(
+        collection(db, 'announcements'),
+        (snapshot) => {
+          const announcementData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setAnnouncements(announcementData);
+        },
+        (error) => {
+          console.error('Error listening to announcements:', error);
+        }
+      );
 
-    const unsubscribeCertificates = onSnapshot(
-      collection(db, 'certificates'),
-      (snapshot) => {
-        const certificateData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setCertificates(certificateData);
-      },
-      (error) => {
-        console.error('Error listening to certificates:', error);
-      }
-    );
+      unsubscribeCoordinators = onSnapshot(
+        collection(db, 'coordinators'),
+        (snapshot) => {
+          const coordinatorData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setCoordinators(coordinatorData);
+        },
+        (error) => {
+          console.error('Error listening to coordinators:', error);
+        }
+      );
 
-    const unsubscribeActivityLogs = onSnapshot(
-      query(collection(db, 'activityLogs'), orderBy('timestamp', 'desc')),
-      (snapshot) => {
-        const logData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setActivityLogs(logData);
-      },
-      (error) => {
-        console.error('Error listening to activity logs:', error);
-      }
-    );
+      unsubscribeCertificates = onSnapshot(
+        collection(db, 'certificates'),
+        (snapshot) => {
+          const certificateData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setCertificates(certificateData);
+        },
+        (error) => {
+          console.error('Error listening to certificates:', error);
+        }
+      );
 
-    // Initialize with sample data if empty
-    const initializeData = async () => {
-      try {
-        const eventsSnapshot = await getDocs(collection(db, 'events'));
-        if (eventsSnapshot.empty) {
-          const initialEvents = [
-            {
-              title: "Hackathon",
-              description: "A 24-hour coding marathon to build innovative solutions using AI and ML.",
-              date: "2024-07-15",
-              time: "10:00 AM",
-              venue: "Main Auditorium",
-              category: "Coding",
-              image: "https://placehold.co/400x250/3b82f6/ffffff?text=Hackathon",
-              teamSize: "1-4",
-              price: 150,
-              maxParticipants: 100,
-              registeredCount: 42,
-              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample1/viewform"
-            },
-            {
-              title: "AI Workshop",
-              description: "Hands-on session on building neural networks and deep learning models.",
-              date: "2024-07-18",
-              time: "2:00 PM",
-              venue: "AI Lab, Block C",
-              category: "Workshop",
-              image: "https://placehold.co/400x250/10b981/ffffff?text=AI+Workshop",
-              teamSize: "1",
-              price: 200,
-              maxParticipants: 50,
-              registeredCount: 28,
-              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample2/viewform"
-            },
-            {
-              title: "Tech Quiz",
-              description: "Test your knowledge in computer science, algorithms, and tech history.",
-              date: "2024-07-20",
-              time: "11:00 AM",
-              venue: "Seminar Hall",
-              category: "Competition",
-              image: "https://placehold.co/400x250/f59e0b/ffffff?text=Tech+Quiz",
-              teamSize: "1-2",
-              price: 100,
-              maxParticipants: 80,
-              registeredCount: 67,
-              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample3/viewform"
+      unsubscribeActivityLogs = onSnapshot(
+        query(collection(db, 'activityLogs'), orderBy('timestamp', 'desc')),
+        (snapshot) => {
+          const logData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setActivityLogs(logData);
+        },
+        (error) => {
+          console.error('Error listening to activity logs:', error);
+        }
+      );
+
+      // Initialize with sample data if empty
+      const initializeData = async () => {
+        try {
+          const eventsSnapshot = await getDocs(collection(db, 'events'));
+          if (eventsSnapshot.empty) {
+            const initialEvents = [
+              {
+                title: "Hackathon",
+                description: "A 24-hour coding marathon to build innovative solutions using AI and ML.",
+                date: "2024-07-15",
+                time: "10:00 AM",
+                venue: "Main Auditorium",
+                category: "Coding",
+                image: "https://placehold.co/400x250/3b82f6/ffffff?text=Hackathon",
+                teamSize: "1-4",
+                price: 150,
+                maxParticipants: 100,
+                registeredCount: 42,
+                googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample1/viewform"
+              },
+              {
+                title: "AI Workshop",
+                description: "Hands-on session on building neural networks and deep learning models.",
+                date: "2024-07-18",
+                time: "2:00 PM",
+                venue: "AI Lab, Block C",
+                category: "Workshop",
+                image: "https://placehold.co/400x250/10b981/ffffff?text=AI+Workshop",
+                teamSize: "1",
+                price: 200,
+                maxParticipants: 50,
+                registeredCount: 28,
+                googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample2/viewform"
+              },
+              {
+                title: "Tech Quiz",
+                description: "Test your knowledge in computer science, algorithms, and tech history.",
+                date: "2024-07-20",
+                time: "11:00 AM",
+                venue: "Seminar Hall",
+                category: "Competition",
+                image: "https://placehold.co/400x250/f59e0b/ffffff?text=Tech+Quiz",
+                teamSize: "1-2",
+                price: 100,
+                maxParticipants: 80,
+                registeredCount: 67,
+                googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample3/viewform"
+              }
+            ];
+            
+            for (const event of initialEvents) {
+              await addDoc(collection(db, 'events'), event);
             }
-          ];
-          
-          for (const event of initialEvents) {
-            await addDoc(collection(db, 'events'), event);
           }
-        }
 
-        const coordinatorsSnapshot = await getDocs(collection(db, 'coordinators'));
-        if (coordinatorsSnapshot.empty) {
-          const initialCoordinators = [
-            {
-              name: "Dr. Anjali Sharma",
-              department: "AI & ML",
-              role: "Event Head",
-              phone: "+91 9876543210",
-              email: "anjali.sharma@college.edu",
-              photo: "https://placehold.co/150x150/d946ef/ffffff?text=AS"
-            },
-            {
-              name: "Rahul Verma",
-              department: "Computer Science",
-              role: "Technical Coordinator",
-              phone: "+91 8765432109",
-              email: "rahul.verma@college.edu",
-              photo: "https://placehold.co/150x150/06b6d4/ffffff?text=RV"
+          const coordinatorsSnapshot = await getDocs(collection(db, 'coordinators'));
+          if (coordinatorsSnapshot.empty) {
+            const initialCoordinators = [
+              {
+                name: "Dr. Anjali Sharma",
+                department: "AI & ML",
+                role: "Event Head",
+                phone: "+91 9876543210",
+                email: "anjali.sharma@college.edu",
+                photo: "https://placehold.co/150x150/d946ef/ffffff?text=AS"
+              },
+              {
+                name: "Rahul Verma",
+                department: "Computer Science",
+                role: "Technical Coordinator",
+                phone: "+91 8765432109",
+                email: "rahul.verma@college.edu",
+                photo: "https://placehold.co/150x150/06b6d4/ffffff?text=RV"
+              }
+            ];
+            
+            for (const coordinator of initialCoordinators) {
+              await addDoc(collection(db, 'coordinators'), coordinator);
             }
-          ];
-          
-          for (const coordinator of initialCoordinators) {
-            await addDoc(collection(db, 'coordinators'), coordinator);
           }
+
+          const announcementsSnapshot = await getDocs(collection(db, 'announcements'));
+          if (announcementsSnapshot.empty) {
+            await addDoc(collection(db, 'announcements'), {
+              message: "Venue for AI Workshop changed to AI Lab, Block C.",
+              urgent: false,
+              date: "2024-06-08"
+            });
+          }
+
+          setLoading(false);
+        } catch (error) {
+          console.error('Error initializing ', error);
+          setLoading(false);
         }
+      };
 
-        const announcementsSnapshot = await getDocs(collection(db, 'announcements'));
-        if (announcementsSnapshot.empty) {
-          await addDoc(collection(db, 'announcements'), {
-            message: "Venue for AI Workshop changed to AI Lab, Block C.",
-            urgent: false,
-            date: "2024-06-08"
-          });
-        }
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error initializing ', error);
-        setLoading(false);
-      }
-    };
-
-    initializeData();
+      initializeData();
+    } catch (error) {
+      console.error('Error setting up listeners:', error);
+      setLoading(false);
+    }
 
     // Cleanup function
     return () => {
-      unsubscribeEvents();
-      unsubscribeRegistrations();
-      unsubscribeAnnouncements();
-      unsubscribeCoordinators();
-      unsubscribeCertificates();
-      unsubscribeActivityLogs();
+      if (unsubscribeEvents) unsubscribeEvents();
+      if (unsubscribeRegistrations) unsubscribeRegistrations();
+      if (unsubscribeAnnouncements) unsubscribeAnnouncements();
+      if (unsubscribeCoordinators) unsubscribeCoordinators();
+      if (unsubscribeCertificates) unsubscribeCertificates();
+      if (unsubscribeActivityLogs) unsubscribeActivityLogs();
     };
   }, []);
 
+  // CRUD operations with proper error handling
   const addEvent = async (eventData) => {
     try {
       const docRef = await addDoc(collection(db, 'events'), {
@@ -282,8 +292,9 @@ const DataProvider = ({ children }) => {
   const deleteEvent = async (eventId) => {
     try {
       // Get event details before deletion
-      const eventDoc = await getDocs(collection(db, 'events'), where('id', '==', eventId));
-      const eventData = eventDoc.docs[0]?.data();
+      const eventQuery = query(collection(db, 'events'), where('id', '==', eventId));
+      const eventSnapshot = await getDocs(eventQuery);
+      const eventData = eventSnapshot.docs[0]?.data();
       
       // Delete the event
       await deleteDoc(doc(db, 'events', eventId));
@@ -353,8 +364,9 @@ const DataProvider = ({ children }) => {
   const deleteAnnouncement = async (announcementId) => {
     try {
       // Get announcement details before deletion
-      const announcementDoc = await getDocs(collection(db, 'announcements'), where('id', '==', announcementId));
-      const announcementData = announcementDoc.docs[0]?.data();
+      const announcementQuery = query(collection(db, 'announcements'), where('id', '==', announcementId));
+      const announcementSnapshot = await getDocs(announcementQuery);
+      const announcementData = announcementSnapshot.docs[0]?.data();
       
       // Delete the announcement
       await deleteDoc(doc(db, 'announcements', announcementId));
@@ -421,8 +433,9 @@ const DataProvider = ({ children }) => {
   const deleteCoordinator = async (coordinatorId) => {
     try {
       // Get coordinator details before deletion
-      const coordinatorDoc = await getDocs(collection(db, 'coordinators'), where('id', '==', coordinatorId));
-      const coordinatorData = coordinatorDoc.docs[0]?.data();
+      const coordinatorQuery = query(collection(db, 'coordinators'), where('id', '==', coordinatorId));
+      const coordinatorSnapshot = await getDocs(coordinatorQuery);
+      const coordinatorData = coordinatorSnapshot.docs[0]?.data();
       
       // Delete the coordinator
       await deleteDoc(doc(db, 'coordinators', coordinatorId));
@@ -722,6 +735,10 @@ const AuthProvider = ({ children }) => {
   // Reset password function
   const resetPassword = async (email) => {
     try {
+      if (!email) {
+        throw new Error('Email address is required');
+      }
+      
       await sendPasswordResetEmail(auth, email);
       return 'Password reset email sent successfully. Please check your inbox.';
     } catch (error) {
@@ -983,15 +1000,15 @@ const HeroSection = () => {
 
 const CertificateSection = () => {
   const { user } = useAuth();
-  const { getUserCertificates } = useData();
+  const { certificates } = useData();
   const [userCertificates, setUserCertificates] = useState([]);
 
   useEffect(() => {
-    if (user) {
-      const certs = getUserCertificates(user.id);
-      setUserCertificates(certs);
+    if (user && certificates) {
+      const userCerts = certificates.filter(cert => cert.userId === user.uid);
+      setUserCertificates(userCerts);
     }
-  }, [user, getUserCertificates]);
+  }, [user, certificates]);
 
   if (!user || userCertificates.length === 0) return null;
 
