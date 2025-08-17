@@ -3,7 +3,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 
 // Import Firebase modules
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
@@ -233,242 +233,6 @@ const DataProvider = ({ children }) => {
     };
   }, []);
 
-  const addEvent = async (eventData) => {
-    try {
-      const docRef = await addDoc(collection(db, 'events'), {
-        ...eventData,
-        registeredCount: 0
-      });
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'event_added',
-        userId: eventData.createdBy || 'system',
-        details: {
-          eventId: docRef.id,
-          eventName: eventData.title
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-      return { id: docRef.id, ...eventData, registeredCount: 0 };
-    } catch (error) {
-      console.error('Error adding event:', error);
-      throw error;
-    }
-  };
-
-  const updateEvent = async (eventId, eventData) => {
-    try {
-      const eventRef = doc(db, 'events', eventId);
-      await updateDoc(eventRef, eventData);
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'event_updated',
-        userId: eventData.updatedBy || 'system',
-        details: {
-          eventId: eventId,
-          eventName: eventData.title
-        },
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error updating event:', error);
-      throw error;
-    }
-  };
-
-  const deleteEvent = async (eventId) => {
-    try {
-      // Get event details before deletion
-      const eventDoc = await getDocs(collection(db, 'events'), where('id', '==', eventId));
-      const eventData = eventDoc.docs[0]?.data();
-      
-      // Delete the event
-      await deleteDoc(doc(db, 'events', eventId));
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'event_deleted',
-        userId: 'system',
-        details: {
-          eventId: eventId,
-          eventName: eventData?.title || 'Unknown Event'
-        },
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error deleting event:', error);
-      throw error;
-    }
-  };
-
-  const addAnnouncement = async (announcementData) => {
-    try {
-      const docRef = await addDoc(collection(db, 'announcements'), {
-        ...announcementData,
-        date: new Date().toISOString().split('T')[0]
-      });
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'announcement_added',
-        userId: 'system',
-        details: {
-          announcementId: docRef.id,
-          message: announcementData.message
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-      return { id: docRef.id, ...announcementData, date: new Date().toISOString().split('T')[0] };
-    } catch (error) {
-      console.error('Error adding announcement:', error);
-      throw error;
-    }
-  };
-
-  const updateAnnouncement = async (announcementId, announcementData) => {
-    try {
-      const announcementRef = doc(db, 'announcements', announcementId);
-      await updateDoc(announcementRef, announcementData);
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'announcement_updated',
-        userId: 'system',
-        details: {
-          announcementId: announcementId,
-          message: announcementData.message
-        },
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error updating announcement:', error);
-      throw error;
-    }
-  };
-
-  const deleteAnnouncement = async (announcementId) => {
-    try {
-      // Get announcement details before deletion
-      const announcementDoc = await getDocs(collection(db, 'announcements'), where('id', '==', announcementId));
-      const announcementData = announcementDoc.docs[0]?.data();
-      
-      // Delete the announcement
-      await deleteDoc(doc(db, 'announcements', announcementId));
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'announcement_deleted',
-        userId: 'system',
-        details: {
-          announcementId: announcementId,
-          message: announcementData?.message || 'Unknown Announcement'
-        },
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error deleting announcement:', error);
-      throw error;
-    }
-  };
-
-  const addCoordinator = async (coordinatorData) => {
-    try {
-      const docRef = await addDoc(collection(db, 'coordinators'), coordinatorData);
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'coordinator_added',
-        userId: 'system',
-        details: {
-          coordinatorId: docRef.id,
-          name: coordinatorData.name
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-      return { id: docRef.id, ...coordinatorData };
-    } catch (error) {
-      console.error('Error adding coordinator:', error);
-      throw error;
-    }
-  };
-
-  const updateCoordinator = async (coordinatorId, coordinatorData) => {
-    try {
-      const coordinatorRef = doc(db, 'coordinators', coordinatorId);
-      await updateDoc(coordinatorRef, coordinatorData);
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'coordinator_updated',
-        userId: 'system',
-        details: {
-          coordinatorId: coordinatorId,
-          name: coordinatorData.name
-        },
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error updating coordinator:', error);
-      throw error;
-    }
-  };
-
-  const deleteCoordinator = async (coordinatorId) => {
-    try {
-      // Get coordinator details before deletion
-      const coordinatorDoc = await getDocs(collection(db, 'coordinators'), where('id', '==', coordinatorId));
-      const coordinatorData = coordinatorDoc.docs[0]?.data();
-      
-      // Delete the coordinator
-      await deleteDoc(doc(db, 'coordinators', coordinatorId));
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'coordinator_deleted',
-        userId: 'system',
-        details: {
-          coordinatorId: coordinatorId,
-          name: coordinatorData?.name || 'Unknown Coordinator'
-        },
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error deleting coordinator:', error);
-      throw error;
-    }
-  };
-
-  const issueCertificate = async (certificateData) => {
-    try {
-      const docRef = await addDoc(collection(db, 'certificates'), {
-        ...certificateData,
-        issuedAt: new Date().toISOString(),
-        status: 'issued'
-      });
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'certificate_issued',
-        userId: certificateData.userId,
-        details: {
-          certificateId: docRef.id,
-          eventName: certificateData.eventName
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-      return { id: docRef.id, ...certificateData, issuedAt: new Date().toISOString(), status: 'issued' };
-    } catch (error) {
-      console.error('Error issuing certificate:', error);
-      throw error;
-    }
-  };
-
   const registerForEvent = async (userId, eventId, registrationData) => {
     // Check if already registered
     const existingRegistration = registrations.find(
@@ -522,30 +286,6 @@ const DataProvider = ({ children }) => {
     }
   };
 
-  const updateProfile = async (userId, profileData) => {
-    try {
-      // In a real app, you would update the user document in Firestore
-      // For now, we'll just simulate the update
-      console.log('Updating profile for user:', userId, profileData);
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'profile_updated',
-        userId: userId,
-        details: {
-          name: profileData.name,
-          email: profileData.email
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-      return true;
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      throw error;
-    }
-  };
-
   const getUserRegistrations = (userId) => {
     return registrations.filter(reg => reg.userId === userId);
   };
@@ -574,17 +314,6 @@ const DataProvider = ({ children }) => {
     getUserRegistrations,
     getEventRegistrations,
     getAllData,
-    addEvent,
-    updateEvent,
-    deleteEvent,
-    addAnnouncement,
-    updateAnnouncement,
-    deleteAnnouncement,
-    addCoordinator,
-    updateCoordinator,
-    deleteCoordinator,
-    issueCertificate,
-    updateProfile,
     loading
   };
 
@@ -719,39 +448,10 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Reset password function
-  const resetPassword = async (email) => {
-    try {
-      await sendPasswordResetEmail(auth, email);
-      return 'Password reset email sent successfully. Please check your inbox.';
-    } catch (error) {
-      console.error('Password reset error:', error);
-      
-      let errorMessage = 'Failed to send password reset email';
-      
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No user found with this email address';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Please enter a valid email address';
-          break;
-        case 'auth/network-request-failed':
-          errorMessage = 'Network error. Please check your internet connection.';
-          break;
-        default:
-          errorMessage = error.message || 'Failed to send password reset email';
-      }
-      
-      throw new Error(errorMessage);
-    }
-  };
-
   const value = {
     user,
     login,
     logout,
-    resetPassword,
     loading
   };
 
@@ -1292,19 +992,17 @@ const CoordinatorsSection = () => {
 };
 
 const LoginForm = () => {
-  const { login, resetPassword } = useAuth();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '', secretCode: '' });
   const [error, setError] = useState('');
   const [isStudentLogin, setIsStudentLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showSecretCode, setShowSecretCode] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
-  const [resetSuccess, setResetSuccess] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setResetSuccess('');
     
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
@@ -1328,20 +1026,17 @@ const LoginForm = () => {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
-    setError('');
-    setResetSuccess('');
-    
     if (!formData.email) {
       setError('Please enter your email address');
       return;
     }
     
     try {
-      const result = await resetPassword(formData.email);
-      setResetSuccess(result);
+      await sendPasswordResetEmail(auth, formData.email);
+      setError(`Password reset email sent to ${formData.email}. Please check your inbox.`);
     } catch (err) {
       console.error('Password reset error:', err);
-      setError(err.message || 'Failed to send password reset email. Please try again.');
+      setError('Failed to send password reset email. Please try again.');
     }
   };
 
@@ -1384,12 +1079,6 @@ const LoginForm = () => {
       {error && (
         <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg text-sm">
           {error}
-        </div>
-      )}
-      
-      {resetSuccess && (
-        <div className="mb-4 p-3 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-lg text-sm">
-          {resetSuccess}
         </div>
       )}
       
@@ -1516,11 +1205,7 @@ const LoginForm = () => {
           {isStudentLogin ? (
             <>
               <button
-                onClick={() => {
-                  setForgotPassword(!forgotPassword);
-                  setError('');
-                  setResetSuccess('');
-                }}
+                onClick={() => setForgotPassword(!forgotPassword)}
                 className="text-blue-600 dark:text-blue-400 hover:underline font-medium mr-4"
               >
                 {forgotPassword ? 'Back to Login' : 'Forgot Password?'}
@@ -1741,11 +1426,9 @@ const RegisterForm = () => {
 
 const ProfileSection = () => {
   const { user, logout } = useAuth();
-  const { updateProfile } = useData();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -1756,33 +1439,6 @@ const ProfileSection = () => {
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
       logout();
-    }
-  };
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    
-    if (!formData.name || !formData.email) {
-      setError('Please fill in all required fields');
-      return;
-    }
-    
-    try {
-      await updateProfile(user.uid, formData);
-      setSuccess('Profile updated successfully!');
-      
-      // Update local user state
-      const updatedUser = { ...user, name: formData.name };
-      // In a real app, you would update the user context
-      // setUser(updatedUser);
-      
-      setTimeout(() => {
-        setIsEditing(false);
-      }, 2000);
-    } catch (err) {
-      setError(err.message || 'Failed to update profile');
     }
   };
 
@@ -1807,12 +1463,6 @@ const ProfileSection = () => {
               {success}
             </div>
           )}
-          
-          {error && (
-            <div className="mb-6 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg">
-              {error}
-            </div>
-          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1">
@@ -1829,87 +1479,23 @@ const ProfileSection = () => {
             </div>
 
             <div className="lg:col-span-2">
-              {!isEditing ? (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Personal Information</h3>
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                    >
-                      Edit Profile
-                    </button>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Personal Information</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Full Name</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{user.name}</span>
                   </div>
-                  <div className="space-y-4">
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400">Full Name</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{user.name}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400">Email</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400">Account Type</span>
-                      <span className="font-medium text-gray-900 dark:text-white capitalize">{user.role}</span>
-                    </div>
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Email</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Account Type</span>
+                    <span className="font-medium text-gray-900 dark:text-white capitalize">{user.role}</span>
                   </div>
                 </div>
-              ) : (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Profile</h3>
-                    <button
-                      onClick={() => {
-                        setIsEditing(false);
-                        setError('');
-                        setSuccess('');
-                      }}
-                      className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  <form onSubmit={handleUpdateProfile} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name *</label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email *</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
-                      <input
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                        placeholder="Leave blank to keep current password"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors"
-                    >
-                      Update Profile
-                    </button>
-                  </form>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -1926,26 +1512,20 @@ const AdminDashboard = () => {
     updateEvent, 
     deleteEvent, 
     addAnnouncement, 
-    updateAnnouncement,
-    deleteAnnouncement,
     coordinators, 
     addCoordinator, 
     updateCoordinator, 
     deleteCoordinator,
-    issueCertificate,
     activityLogs
   } = useData();
   
   const [activeTab, setActiveTab] = useState('events');
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingCoordinator, setEditingCoordinator] = useState(null);
-  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [showCoordinatorForm, setShowCoordinatorForm] = useState(false);
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  const [showCertificateForm, setShowCertificateForm] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({ message: '', urgent: false });
-  const [certificateForm, setCertificateForm] = useState({ userId: '', eventName: '', eventDate: '' });
   
   if (!user || user.role !== 'admin') return null;
 
@@ -2269,8 +1849,8 @@ const AdminDashboard = () => {
     );
   };
 
-  const AnnouncementForm = ({ announcement, onSave, onCancel }) => {
-    const [formData, setFormData] = useState(announcement || { message: '', urgent: false });
+  const AnnouncementForm = ({ onSubmit, onCancel }) => {
+    const [formData, setFormData] = useState(announcementForm);
 
     const handleChange = (e) => {
       const { name, value, type, checked } = e.target;
@@ -2283,13 +1863,9 @@ const AdminDashboard = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       try {
-        if (announcement) {
-          await updateAnnouncement(announcement.id, formData);
-        } else {
-          await addAnnouncement(formData);
-        }
+        await addAnnouncement(formData);
         setShowAnnouncementForm(false);
-        setEditingAnnouncement(null);
+        setAnnouncementForm({ message: '', urgent: false });
       } catch (error) {
         console.error('Error adding announcement:', error);
       }
@@ -2297,9 +1873,7 @@ const AdminDashboard = () => {
 
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
-          {announcement ? 'Edit Announcement' : 'Add New Announcement'}
-        </h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Post New Announcement</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message *</label>
@@ -2331,85 +1905,7 @@ const AdminDashboard = () => {
               type="submit"
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
             >
-              {announcement ? 'Update Announcement' : 'Add Announcement'}
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-500 px-6 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    );
-  };
-
-  const CertificateForm = ({ onSubmit, onCancel }) => {
-    const [formData, setFormData] = useState(certificateForm);
-
-    const handleChange = (e) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      try {
-        await issueCertificate(formData);
-        setShowCertificateForm(false);
-        setCertificateForm({ userId: '', eventName: '', eventDate: '' });
-      } catch (error) {
-        console.error('Error issuing certificate:', error);
-      }
-    };
-
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Issue Certificate</h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User ID *</label>
-            <input
-              type="text"
-              name="userId"
-              value={formData.userId}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              placeholder="Enter user ID"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Name *</label>
-            <input
-              type="text"
-              name="eventName"
-              value={formData.eventName}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              placeholder="Enter event name"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Date *</label>
-            <input
-              type="date"
-              name="eventDate"
-              value={formData.eventDate}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              required
-            />
-          </div>
-          <div className="flex space-x-4 pt-4">
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Issue Certificate
+              Post Announcement
             </button>
             <button
               type="button"
@@ -2432,10 +1928,7 @@ const AdminDashboard = () => {
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Manage Events</h3>
               <button
-                onClick={() => {
-                  setEditingEvent(null);
-                  setShowEventForm(true);
-                }}
+                onClick={() => setShowEventForm(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
               >
                 Add New Event
@@ -2503,10 +1996,7 @@ const AdminDashboard = () => {
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Manage Announcements</h3>
               <button
-                onClick={() => {
-                  setEditingAnnouncement(null);
-                  setShowAnnouncementForm(true);
-                }}
+                onClick={() => setShowAnnouncementForm(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
               >
                 Add Announcement
@@ -2515,19 +2005,14 @@ const AdminDashboard = () => {
             
             {showAnnouncementForm ? (
               <AnnouncementForm
-                announcement={editingAnnouncement}
-                onSave={(announcementData) => {
-                  if (editingAnnouncement) {
-                    updateAnnouncement(editingAnnouncement.id, announcementData);
-                  } else {
-                    addAnnouncement(announcementData);
-                  }
+                onSubmit={(data) => {
+                  addAnnouncement(data);
                   setShowAnnouncementForm(false);
-                  setEditingAnnouncement(null);
+                  setAnnouncementForm({ message: '', urgent: false });
                 }}
                 onCancel={() => {
                   setShowAnnouncementForm(false);
-                  setEditingAnnouncement(null);
+                  setAnnouncementForm({ message: '', urgent: false });
                 }}
               />
             ) : null}
@@ -2535,38 +2020,28 @@ const AdminDashboard = () => {
             <div>
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Recent Announcements</h3>
               <div className="space-y-3">
-                {announcements.map(announcement => (
-                  <div key={announcement.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <div className="flex justify-between items-start">
-                      <p className="text-gray-900 dark:text-white">{announcement.message}</p>
-                      <div className="flex space-x-2 ml-4">
-                        <button
-                          onClick={() => {
-                            setEditingAnnouncement(announcement);
-                            setShowAnnouncementForm(true);
-                          }}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteAnnouncement(announcement.id)}
-                          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm"
-                        >
-                          Delete
-                        </button>
+                {activityLogs
+                  .filter(log => log.action === 'announcement_added')
+                  .slice(-5)
+                  .map(log => (
+                    <div key={log.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                      <div className="flex justify-between items-start">
+                        <p className="text-gray-900 dark:text-white">{log.details.message}</p>
+                        <div className="flex space-x-2 ml-4">
+                          <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm">Edit</button>
+                          <button className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm">Delete</button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">{new Date(log.timestamp).toLocaleString()}</span>
+                        {log.details.urgent && (
+                          <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                            URGENT
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">{announcement.date}</span>
-                      {announcement.urgent && (
-                        <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
-                          URGENT
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
@@ -2578,10 +2053,7 @@ const AdminDashboard = () => {
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Manage Coordinators</h3>
               <button
-                onClick={() => {
-                  setEditingCoordinator(null);
-                  setShowCoordinatorForm(true);
-                }}
+                onClick={() => setShowCoordinatorForm(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
               >
                 Add Coordinator
@@ -2678,7 +2150,7 @@ const AdminDashboard = () => {
                       .map(log => (
                         <tr key={log.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            {log.details.eventName}
+                            Event #{log.details.eventId}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             User #{log.userId}
@@ -2759,7 +2231,7 @@ const AdminDashboard = () => {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Announcements</p>
                     <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                      {announcements.length}
+                      {activityLogs.filter(log => log.action === 'announcement_added').length}
                     </p>
                   </div>
                 </div>
@@ -2790,55 +2262,44 @@ const AdminDashboard = () => {
       case 'certificates':
         return (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Issue Certificates</h3>
-              <button
-                onClick={() => setShowCertificateForm(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-              >
-                Issue Certificate
-              </button>
-            </div>
-            
-            {showCertificateForm ? (
-              <CertificateForm
-                onSubmit={(data) => {
-                  issueCertificate(data);
-                  setShowCertificateForm(false);
-                }}
-                onCancel={() => {
-                  setShowCertificateForm(false);
-                }}
-              />
-            ) : null}
-            
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Recent Certificates</h3>
-              <div className="space-y-3">
-                {activityLogs
-                  .filter(log => log.action === 'certificate_issued')
-                  .slice(-5)
-                  .map(log => (
-                    <div key={log.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="text-gray-900 dark:text-white">Certificate for {log.details.eventName}</p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Issued to User #{log.userId}</p>
-                        </div>
-                        <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm">
-                          View
-                        </button>
-                      </div>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </span>
-                        <span className="text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded">
-                          ISSUED
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Certificate Management</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 className="font-bold text-gray-900 dark:text-white mb-4">Upload Certificate Template</h4>
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 10h-1m-5.9-5a4 4 0 010 8H9" />
+                  </svg>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Drag and drop PDF file here, or click to select</p>
+                  <button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                    Choose File
+                  </button>
+                </div>
+              </div>
+              
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h4 className="font-bold text-gray-900 dark:text-white mb-4">Issue Certificates</h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Event</label>
+                    <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
+                      <option>Select an event</option>
+                      {events.map(event => (
+                        <option key={event.id} value={event.id}>{event.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Participants</label>
+                    <select multiple className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-32">
+                      <option value="1">John Doe (john.doe@college.edu)</option>
+                      <option value="2">Jane Smith (jane.smith@college.edu)</option>
+                    </select>
+                  </div>
+                  <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition-colors">
+                    Issue Certificates
+                  </button>
+                </div>
               </div>
             </div>
           </div>
