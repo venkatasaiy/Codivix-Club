@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useContext, createContext } from 'react';
+// App.jsx
+import React, { useState, useEffect, createContext, useContext } from 'react';
 
-// Import the functions you need from the SDKs you need
+// Import Firebase modules
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, getDoc } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
-// This is safe to include in client-side code
 const firebaseConfig = {
   apiKey: "AIzaSyBZrglM9-lsraWWfiNam5znMGlwbGp1SiI",
   authDomain: "codivixclub.firebaseapp.com",
@@ -19,7 +19,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Contexts
@@ -27,10 +27,9 @@ const AuthContext = createContext();
 const DataContext = createContext();
 const ThemeContext = createContext();
 
-// Data Provider - Handles all data persistence with Firebase
+// Data Provider
 const DataProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
-  const [users, setUsers] = useState([]);
   const [registrations, setRegistrations] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
@@ -38,247 +37,220 @@ const DataProvider = ({ children }) => {
   const [activityLogs, setActivityLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Set up real-time listeners for all collections
+  // Set up real-time listeners with error handling
   useEffect(() => {
-    const unsubscribeEvents = onSnapshot(collection(db, 'events'), (snapshot) => {
-      const eventData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setEvents(eventData);
-    });
+    const unsubscribeEvents = onSnapshot(
+      collection(db, 'events'), 
+      (snapshot) => {
+        const eventData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setEvents(eventData);
+      },
+      (error) => {
+        console.error('Error fetching events:', error);
+      }
+    );
 
-    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const userData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setUsers(userData);
-    });
+    const unsubscribeRegistrations = onSnapshot(
+      collection(db, 'registrations'), 
+      (snapshot) => {
+        const registrationData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setRegistrations(registrationData);
+      },
+      (error) => {
+        console.error('Error fetching registrations:', error);
+      }
+    );
 
-    const unsubscribeRegistrations = onSnapshot(collection(db, 'registrations'), (snapshot) => {
-      const registrationData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setRegistrations(registrationData);
-    });
+    const unsubscribeAnnouncements = onSnapshot(
+      collection(db, 'announcements'), 
+      (snapshot) => {
+        const announcementData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setAnnouncements(announcementData);
+      },
+      (error) => {
+        console.error('Error fetching announcements:', error);
+      }
+    );
 
-    const unsubscribeAnnouncements = onSnapshot(collection(db, 'announcements'), (snapshot) => {
-      const announcementData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setAnnouncements(announcementData);
-    });
+    const unsubscribeCoordinators = onSnapshot(
+      collection(db, 'coordinators'), 
+      (snapshot) => {
+        const coordinatorData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setCoordinators(coordinatorData);
+      },
+      (error) => {
+        console.error('Error fetching coordinators:', error);
+      }
+    );
 
-    const unsubscribeCoordinators = onSnapshot(collection(db, 'coordinators'), (snapshot) => {
-      const coordinatorData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setCoordinators(coordinatorData);
-    });
+    const unsubscribeCertificates = onSnapshot(
+      collection(db, 'certificates'), 
+      (snapshot) => {
+        const certificateData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setCertificates(certificateData);
+      },
+      (error) => {
+        console.error('Error fetching certificates:', error);
+      }
+    );
 
-    const unsubscribeCertificates = onSnapshot(collection(db, 'certificates'), (snapshot) => {
-      const certificateData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setCertificates(certificateData);
-    });
-
-    const unsubscribeActivityLogs = onSnapshot(collection(db, 'activityLogs'), (snapshot) => {
-      const logData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setActivityLogs(logData);
-    });
+    const unsubscribeActivityLogs = onSnapshot(
+      collection(db, 'activityLogs'), 
+      (snapshot) => {
+        const logData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setActivityLogs(logData);
+      },
+      (error) => {
+        console.error('Error fetching activity logs:', error);
+      }
+    );
 
     // Initialize with sample data if empty
     const initializeData = async () => {
-      const eventsSnapshot = await getDocs(collection(db, 'events'));
-      if (eventsSnapshot.empty) {
-        const initialEvents = [
-          {
-            title: "Hackathon",
-            description: "A 24-hour coding marathon to build innovative solutions using AI and ML.",
-            date: "2024-07-15",
-            time: "10:00 AM",
-            venue: "Main Auditorium",
-            category: "Coding",
-            image: "https://placehold.co/400x250/3b82f6/ffffff?text=Hackathon",
-            teamSize: "1-4",
-            price: 150,
-            maxParticipants: 100,
-            registeredCount: 42,
-            googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample1/viewform"
-          },
-          {
-            title: "AI Workshop",
-            description: "Hands-on session on building neural networks and deep learning models.",
-            date: "2024-07-18",
-            time: "2:00 PM",
-            venue: "AI Lab, Block C",
-            category: "Workshop",
-            image: "https://placehold.co/400x250/10b981/ffffff?text=AI+Workshop",
-            teamSize: "1",
-            price: 200,
-            maxParticipants: 50,
-            registeredCount: 28,
-            googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample2/viewform"
-          },
-          {
-            title: "Tech Quiz",
-            description: "Test your knowledge in computer science, algorithms, and tech history.",
-            date: "2024-07-20",
-            time: "11:00 AM",
-            venue: "Seminar Hall",
-            category: "Competition",
-            image: "https://placehold.co/400x250/f59e0b/ffffff?text=Tech+Quiz",
-            teamSize: "1-2",
-            price: 100,
-            maxParticipants: 80,
-            registeredCount: 67,
-            googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample3/viewform"
+      try {
+        const eventsSnapshot = await getDocs(collection(db, 'events'));
+        if (eventsSnapshot.empty) {
+          const initialEvents = [
+            {
+              title: "Hackathon",
+              description: "A 24-hour coding marathon to build innovative solutions using AI and ML.",
+              date: "2024-07-15",
+              time: "10:00 AM",
+              venue: "Main Auditorium",
+              category: "Coding",
+              image: "https://placehold.co/400x250/3b82f6/ffffff?text=Hackathon",
+              teamSize: "1-4",
+              price: 150,
+              maxParticipants: 100,
+              registeredCount: 42,
+              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample1/viewform"
+            },
+            {
+              title: "AI Workshop",
+              description: "Hands-on session on building neural networks and deep learning models.",
+              date: "2024-07-18",
+              time: "2:00 PM",
+              venue: "AI Lab, Block C",
+              category: "Workshop",
+              image: "https://placehold.co/400x250/10b981/ffffff?text=AI+Workshop",
+              teamSize: "1",
+              price: 200,
+              maxParticipants: 50,
+              registeredCount: 28,
+              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample2/viewform"
+            },
+            {
+              title: "Tech Quiz",
+              description: "Test your knowledge in computer science, algorithms, and tech history.",
+              date: "2024-07-20",
+              time: "11:00 AM",
+              venue: "Seminar Hall",
+              category: "Competition",
+              image: "https://placehold.co/400x250/f59e0b/ffffff?text=Tech+Quiz",
+              teamSize: "1-2",
+              price: 100,
+              maxParticipants: 80,
+              registeredCount: 67,
+              googleFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfexample3/viewform"
+            }
+          ];
+          
+          for (const event of initialEvents) {
+            await addDoc(collection(db, 'events'), event);
           }
-        ];
-        
-        for (const event of initialEvents) {
-          await addDoc(collection(db, 'events'), event);
         }
-      }
 
-      const coordinatorsSnapshot = await getDocs(collection(db, 'coordinators'));
-      if (coordinatorsSnapshot.empty) {
-        const initialCoordinators = [
-          {
-            name: "Dr. Anjali Sharma",
-            department: "AI & ML",
-            role: "Event Head",
-            phone: "+91 9876543210",
-            email: "anjali.sharma@college.edu",
-            photo: "https://placehold.co/150x150/d946ef/ffffff?text=AS"
-          },
-          {
-            name: "Rahul Verma",
-            department: "Computer Science",
-            role: "Technical Coordinator",
-            phone: "+91 8765432109",
-            email: "rahul.verma@college.edu",
-            photo: "https://placehold.co/150x150/06b6d4/ffffff?text=RV"
+        const coordinatorsSnapshot = await getDocs(collection(db, 'coordinators'));
+        if (coordinatorsSnapshot.empty) {
+          const initialCoordinators = [
+            {
+              name: "Dr. Anjali Sharma",
+              department: "AI & ML",
+              role: "Event Head",
+              phone: "+91 9876543210",
+              email: "anjali.sharma@college.edu",
+              photo: "https://placehold.co/150x150/d946ef/ffffff?text=AS"
+            },
+            {
+              name: "Rahul Verma",
+              department: "Computer Science",
+              role: "Technical Coordinator",
+              phone: "+91 8765432109",
+              email: "rahul.verma@college.edu",
+              photo: "https://placehold.co/150x150/06b6d4/ffffff?text=RV"
+            }
+          ];
+          
+          for (const coordinator of initialCoordinators) {
+            await addDoc(collection(db, 'coordinators'), coordinator);
           }
-        ];
-        
-        for (const coordinator of initialCoordinators) {
-          await addDoc(collection(db, 'coordinators'), coordinator);
         }
+
+        const announcementsSnapshot = await getDocs(collection(db, 'announcements'));
+        if (announcementsSnapshot.empty) {
+          await addDoc(collection(db, 'announcements'), {
+            message: "Venue for AI Workshop changed to AI Lab, Block C.",
+            urgent: false,
+            date: "2024-06-08"
+          });
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        setLoading(false);
       }
 
-      const announcementsSnapshot = await getDocs(collection(db, 'announcements'));
-      if (announcementsSnapshot.empty) {
-        await addDoc(collection(db, 'announcements'), {
-          message: "Venue for AI Workshop changed to AI Lab, Block C.",
-          urgent: false,
-          date: "2024-06-08"
-        });
-      }
-
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      if (usersSnapshot.empty) {
-        await addDoc(collection(db, 'users'), {
-          name: "Admin User",
-          email: "admin@college.edu",
-          password: "admin123",
-          role: "admin",
-          createdAt: new Date().toISOString(),
-          lastLogin: null
-        });
-      }
+      // Cleanup function
+      return () => {
+        unsubscribeEvents();
+        unsubscribeRegistrations();
+        unsubscribeAnnouncements();
+        unsubscribeCoordinators();
+        unsubscribeCertificates();
+        unsubscribeActivityLogs();
+      };
     };
 
     initializeData();
-    setLoading(false);
-
-    // Cleanup function
-    return () => {
-      unsubscribeEvents();
-      unsubscribeUsers();
-      unsubscribeRegistrations();
-      unsubscribeAnnouncements();
-      unsubscribeCoordinators();
-      unsubscribeCertificates();
-      unsubscribeActivityLogs();
-    };
   }, []);
 
-  // Helper functions for data operations
-  const addActivityLog = async (action, userId, details = {}) => {
-    try {
-      await addDoc(collection(db, 'activityLogs'), {
-        timestamp: new Date().toISOString(),
-        action,
-        userId,
-        details
-      });
-    } catch (error) {
-      console.error('Error adding activity log:', error);
-    }
-  };
-
-  const createUser = async (userData) => {
-    try {
-      const newUser = {
-        ...userData,
-        createdAt: new Date().toISOString(),
-        lastLogin: null
-      };
-      
-      const docRef = await addDoc(collection(db, 'users'), newUser);
-      const createdUser = { id: docRef.id, ...newUser };
-      
-      addActivityLog('user_registered', docRef.id, { email: userData.email });
-      return createdUser;
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
-    }
-  };
-
-  const findUser = (email) => {
-    return users.find(user => user.email === email);
-  };
-
-  const updateUserLastLogin = async (userId) => {
-    try {
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
-        lastLogin: new Date().toISOString()
-      });
-      addActivityLog('user_login', userId);
-    } catch (error) {
-      console.error('Error updating last login:', error);
-    }
-  };
-
   const registerForEvent = async (userId, eventId, registrationData) => {
-    // Check if already registered
-    const existingRegistration = registrations.find(
-      reg => reg.userId === userId && reg.eventId === eventId
-    );
-    
-    if (existingRegistration) {
-      throw new Error('You are already registered for this event');
-    }
-
-    // Check if event has available slots
-    const event = events.find(e => e.id === eventId);
-    if (event && event.registeredCount >= event.maxParticipants) {
-      throw new Error('This event is full');
-    }
-
     try {
+      // Check if already registered
+      const q = query(collection(db, 'registrations'), where('userId', '==', userId), where('eventId', '==', eventId));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        throw new Error('You are already registered for this event');
+      }
+
+      // Check if event has available slots
+      const eventDoc = await getDoc(doc(db, 'events', eventId));
+      const event = eventDoc.data();
+      
+      if (event && event.registeredCount >= event.maxParticipants) {
+        throw new Error('This event is full');
+      }
+
       const newRegistration = {
         userId,
         eventId,
@@ -291,13 +263,10 @@ const DataProvider = ({ children }) => {
       const docRef = await addDoc(collection(db, 'registrations'), newRegistration);
       
       // Update event registration count
-      const eventRef = doc(db, 'events', eventId);
-      await updateDoc(eventRef, {
+      await updateDoc(doc(db, 'events', eventId), {
         registeredCount: event.registeredCount + 1
       });
 
-      addActivityLog('event_registration', userId, { eventId, registrationData });
-      
       return { id: docRef.id, ...newRegistration };
     } catch (error) {
       console.error('Error registering for event:', error);
@@ -315,7 +284,6 @@ const DataProvider = ({ children }) => {
 
   const getAllData = () => ({
     events,
-    users,
     registrations,
     announcements,
     coordinators,
@@ -323,153 +291,17 @@ const DataProvider = ({ children }) => {
     activityLogs
   });
 
-  const addEvent = async (eventData) => {
-    try {
-      const newEventData = {
-        ...eventData,
-        registeredCount: 0
-      };
-
-      const docRef = await addDoc(collection(db, 'events'), newEventData);
-      const createdEvent = { id: docRef.id, ...newEventData };
-      
-      addActivityLog('event_created', null, { eventId: docRef.id, title: eventData.title });
-      return createdEvent;
-    } catch (error) {
-      console.error('Error adding event:', error);
-      throw error;
-    }
-  };
-
-  const updateEvent = async (eventId, eventData) => {
-    try {
-      const eventRef = doc(db, 'events', eventId);
-      await updateDoc(eventRef, eventData);
-      addActivityLog('event_updated', null, { eventId, title: eventData.title });
-    } catch (error) {
-      console.error('Error updating event:', error);
-      throw error;
-    }
-  };
-
-  const deleteEvent = async (eventId) => {
-    try {
-      // Delete the event
-      await deleteDoc(doc(db, 'events', eventId));
-      
-      // Delete related registrations
-      const registrationsToDelete = registrations.filter(reg => reg.eventId === eventId);
-      for (const reg of registrationsToDelete) {
-        await deleteDoc(doc(db, 'registrations', reg.id));
-      }
-      
-      addActivityLog('event_deleted', null, { eventId });
-    } catch (error) {
-      console.error('Error deleting event:', error);
-      throw error;
-    }
-  };
-
-  const addAnnouncement = async (announcementData) => {
-    try {
-      const newAnnouncement = {
-        ...announcementData,
-        date: new Date().toISOString()
-      };
-
-      const docRef = await addDoc(collection(db, 'announcements'), newAnnouncement);
-      const createdAnnouncement = { id: docRef.id, ...newAnnouncement };
-      
-      addActivityLog('announcement_added', null, { message: announcementData.message });
-      return createdAnnouncement;
-    } catch (error) {
-      console.error('Error adding announcement:', error);
-      throw error;
-    }
-  };
-
-  const addCoordinator = async (coordinatorData) => {
-    try {
-      const docRef = await addDoc(collection(db, 'coordinators'), coordinatorData);
-      const createdCoordinator = { id: docRef.id, ...coordinatorData };
-      
-      addActivityLog('coordinator_added', null, { name: coordinatorData.name });
-      return createdCoordinator;
-    } catch (error) {
-      console.error('Error adding coordinator:', error);
-      throw error;
-    }
-  };
-
-  const updateCoordinator = async (coordinatorId, coordinatorData) => {
-    try {
-      const coordinatorRef = doc(db, 'coordinators', coordinatorId);
-      await updateDoc(coordinatorRef, coordinatorData);
-      addActivityLog('coordinator_updated', null, { coordinatorId, name: coordinatorData.name });
-    } catch (error) {
-      console.error('Error updating coordinator:', error);
-      throw error;
-    }
-  };
-
-  const deleteCoordinator = async (coordinatorId) => {
-    try {
-      await deleteDoc(doc(db, 'coordinators', coordinatorId));
-      addActivityLog('coordinator_deleted', null, { coordinatorId });
-    } catch (error) {
-      console.error('Error deleting coordinator:', error);
-      throw error;
-    }
-  };
-
-  const issueCertificate = async (certificateData) => {
-    try {
-      const newCertificate = {
-        ...certificateData,
-        issuedAt: new Date().toISOString(),
-        status: 'issued'
-      };
-
-      const docRef = await addDoc(collection(db, 'certificates'), newCertificate);
-      const createdCertificate = { id: docRef.id, ...newCertificate };
-      
-      addActivityLog('certificate_issued', null, { userId: certificateData.userId, eventId: certificateData.eventId });
-      return createdCertificate;
-    } catch (error) {
-      console.error('Error issuing certificate:', error);
-      throw error;
-    }
-  };
-
-  const getUserCertificates = (userId) => {
-    return certificates.filter(cert => cert.userId === userId);
-  };
-
   const value = {
     events,
-    users,
     registrations,
     announcements,
     coordinators,
     certificates,
     activityLogs,
-    createUser,
-    findUser,
-    updateUserLastLogin,
     registerForEvent,
     getUserRegistrations,
     getEventRegistrations,
     getAllData,
-    addEvent,
-    updateEvent,
-    deleteEvent,
-    addAnnouncement,
-    addCoordinator,
-    updateCoordinator,
-    deleteCoordinator,
-    issueCertificate,
-    getUserCertificates,
-    addActivityLog,
     loading
   };
 
@@ -484,78 +316,189 @@ const DataProvider = ({ children }) => {
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { findUser, updateUserLastLogin, createUser } = useContext(DataContext);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('codvix_current_user');
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-      } catch (e) {
-        console.error('Failed to parse user data:', e);
+    // Listen for authentication state changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // For now, assume all users are students
+          const userData = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+            role: 'student'
+          };
+          
+          setUser(userData);
+        } catch (error) {
+          console.error('Error getting user claims:', error);
+          const userData = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.email.split('@')[0],
+            role: 'student'
+          };
+          setUser(userData);
+        }
+      } else {
+        setUser(null);
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
+  // Login function with improved error handling
   const login = async (email, password, secretCode = null) => {
-    const user = findUser(email);
-    
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    // Admin login with secret code
-    if (user.role === 'admin') {
-      if (password !== 'admin123' || secretCode !== 'CODIVIX2025') {
+    try {
+      console.log('Attempting login with:', email);
+      
+      // Sign in with Firebase Authentication
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      console.log('User signed in:', firebaseUser.uid);
+      
+      // For admin users, verify the secret code
+      if (email.includes('admin') && secretCode !== 'CODIVIX2025') {
         throw new Error('Invalid admin credentials');
       }
-    } else {
-      // Regular user login
-      if (password.length < 6) {
-        throw new Error('Invalid password');
+      
+      const userData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+        role: email.includes('admin') ? 'admin' : 'student'
+      };
+      
+      setUser(userData);
+      console.log('Login successful:', userData);
+      
+      return userData;
+    } catch (error) {
+      console.error('Login error details:', error);
+      
+      let errorMessage = 'Login failed';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No user found with this email address';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'Incorrect password';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        case 'auth/user-disabled':
+          errorMessage = 'This account has been disabled';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many login attempts. Please try again later.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your internet connection.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Authentication method not enabled. Please contact the administrator.';
+          break;
+        case 'auth/invalid-credential':
+          errorMessage = 'Invalid email or password';
+          break;
+        default:
+          errorMessage = error.message || 'Login failed';
       }
+      
+      throw new Error(errorMessage);
     }
-
-    updateUserLastLogin(user.id);
-    setUser(user);
-    localStorage.setItem('codvix_current_user', JSON.stringify(user));
-    return user;
   };
 
-  const register = async (userData) => {
-    // Check if email already exists
-    if (findUser(userData.email)) {
-      throw new Error('Email already registered');
+  // Register function
+  const register = async ({ name, email, password, role = 'student' }) => {
+    try {
+      console.log('Attempting registration with:', email);
+      
+      // Create user with Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      console.log('User registered:', firebaseUser.uid);
+      
+      // Create user profile in Firestore
+      const userData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: name,
+        role: role,
+        createdAt: new Date().toISOString()
+      };
+      
+      // Store user data (optional - you can skip this if you don't need additional user data)
+      // await addDoc(collection(db, 'users'), userData);
+      
+      // Set the user in state
+      setUser({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: name,
+        role: role
+      });
+      
+      console.log('Registration successful:', userData);
+      
+      return userData;
+    } catch (error) {
+      console.error('Registration error details:', error);
+      
+      let errorMessage = 'Registration failed';
+      
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'An account with this email already exists';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password is too weak. Please use at least 6 characters';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Registration is currently disabled. Please contact the administrator.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your internet connection.';
+          break;
+        default:
+          errorMessage = error.message || 'Registration failed';
+      }
+      
+      throw new Error(errorMessage);
     }
-
-    const newUser = await createUser(userData);
-    setUser(newUser);
-    localStorage.setItem('codvix_current_user', JSON.stringify(newUser));
-    return newUser;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('codvix_current_user');
+  // Logout function
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
-  const updateProfile = async (updatedData) => {
-    const newUser = { ...user, ...updatedData };
-    setUser(newUser);
-    localStorage.setItem('codvix_current_user', JSON.stringify(newUser));
-    
-    // Update in Firestore
-    const userRef = doc(db, 'users', user.id);
-    await updateDoc(userRef, updatedData);
-    
-    const { addActivityLog } = useContext(DataContext);
-    addActivityLog('profile_updated', user.id, updatedData);
+  const value = {
+    user,
+    login,
+    register,
+    logout,
+    loading
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateProfile, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -609,7 +552,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold">CODVIX CLUB</h1>
+              <h1 className="text-2xl font-bold">CODIVIX CLUB</h1>
             </div>
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
@@ -740,7 +683,7 @@ const HeroSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-              CODVIX <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">CLUB</span>
+              CODIVIX <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">CLUB</span>
             </h1>
             <p className="text-xl text-gray-700 dark:text-gray-300 mb-8">
               The premier tech event of the year, organized by the AI & ML Department. 
@@ -769,8 +712,8 @@ const HeroSection = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg transform rotate-6 opacity-20"></div>
             <img 
-              src="https://placehold.co/600x400/6366f1/ffffff?text=CODVIX+Club" 
-              alt="CODVIX Club" 
+              src="https://placehold.co/600x400/6366f1/ffffff?text=CODIVIX+Club" 
+              alt="CODIVIX Club" 
               className="relative rounded-lg shadow-2xl"
             />
           </div>
@@ -1063,7 +1006,7 @@ const CoordinatorsSection = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">Event Coordinators</h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300">Meet the team behind CODVIX CLUB</p>
+          <p className="text-xl text-gray-600 dark:text-gray-300">Meet the team behind CODIVIX CLUB</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {coordinators.map((coordinator) => (
@@ -1082,6 +1025,7 @@ const LoginForm = () => {
   const [isStudentLogin, setIsStudentLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showSecretCode, setShowSecretCode] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1093,6 +1037,8 @@ const LoginForm = () => {
     }
     
     try {
+      console.log('Login attempt:', { email: formData.email, isStudent: isStudentLogin });
+      
       if (isStudentLogin) {
         await login(formData.email, formData.password);
       } else {
@@ -1100,7 +1046,24 @@ const LoginForm = () => {
       }
       document.getElementById('login-modal').classList.add('hidden');
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.message || 'Invalid credentials');
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!formData.email) {
+      setError('Please enter your email address');
+      return;
+    }
+    
+    try {
+      await sendPasswordResetEmail(auth, formData.email);
+      setError(`Password reset email sent to ${formData.email}. Please check your inbox.`);
+    } catch (err) {
+      console.error('Password reset error:', err);
+      setError('Failed to send password reset email. Please try again.');
     }
   };
 
@@ -1146,101 +1109,134 @@ const LoginForm = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit}>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {isStudentLogin ? 'Email' : 'Admin Email'}
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              placeholder={isStudentLogin ? "Enter your email" : "admin@college.edu"}
-              required
-            />
-          </div>
-          <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {isStudentLogin ? 'Password' : 'Password'}
-            </label>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
-              placeholder="Enter your password"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-            >
-              <div className="w-5 h-5 flex items-center justify-center">
-                {showPassword ? (
-                  <svg className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                )}
-              </div>
-            </button>
-          </div>
-          {!isStudentLogin && (
-            <div className="relative">
+      {!forgotPassword ? (
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Secret Code *
+                {isStudentLogin ? 'Email' : 'Admin Email'}
               </label>
               <input
-                type={showSecretCode ? 'text' : 'password'}
-                name="secretCode"
-                value={formData.secretCode}
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                placeholder={isStudentLogin ? "Enter your email" : "admin@college.edu"}
+                required
+              />
+            </div>
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {isStudentLogin ? 'Password' : 'Password'}
+              </label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
-                placeholder="Enter admin secret code"
+                placeholder="Enter your password"
                 required
               />
               <button
                 type="button"
-                onClick={() => setShowSecretCode(!showSecretCode)}
+                onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
               >
                 <div className="w-5 h-5 flex items-center justify-center">
-                  {showSecretCode ? (
+                  {showPassword ? (
                     <svg className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   ) : (
                     <svg className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.00 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                     </svg>
                   )}
                 </div>
               </button>
             </div>
-          )}
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors"
-          >
-            {isStudentLogin ? 'Login as Student' : 'Login as Admin'}
-          </button>
-        </div>
-      </form>
+            {!isStudentLogin && (
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Secret Code *
+                </label>
+                <input
+                  type={showSecretCode ? 'text' : 'password'}
+                  name="secretCode"
+                  value={formData.secretCode}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+                  placeholder="Enter admin secret code"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecretCode(!showSecretCode)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    {showSecretCode ? (
+                      <svg className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.00 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+              </div>
+            )}
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors"
+            >
+              {isStudentLogin ? 'Login as Student' : 'Login as Admin'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <form onSubmit={handleForgotPassword}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Enter your email to reset password
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors"
+            >
+              Send Reset Email
+            </button>
+          </div>
+        </form>
+      )}
       
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600 dark:text-gray-400">
           {isStudentLogin ? (
             <>
+              <button
+                onClick={() => setForgotPassword(!forgotPassword)}
+                className="text-blue-600 dark:text-blue-400 hover:underline font-medium mr-4"
+              >
+                {forgotPassword ? 'Back to Login' : 'Forgot Password?'}
+              </button>
               Don't have an account?{' '}
               <button
                 onClick={() => {
@@ -1326,7 +1322,7 @@ const RegisterForm = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 max-w-md w-full">
-      <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-6">Register for CODVIX CLUB</h2>
+      <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-6">Register for CODIVIX CLUB</h2>
       
       {error && (
         <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg text-sm">
@@ -1390,7 +1386,7 @@ const RegisterForm = () => {
                     </svg>
                   ) : (
                     <svg className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.00 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                     </svg>
                   )}
                 </div>
@@ -1421,7 +1417,7 @@ const RegisterForm = () => {
                     </svg>
                   ) : (
                     <svg className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.00 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                     </svg>
                   )}
                 </div>
@@ -1456,7 +1452,7 @@ const RegisterForm = () => {
 };
 
 const ProfileSection = () => {
-  const { user, updateProfile, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [success, setSuccess] = useState('');
@@ -1466,34 +1462,6 @@ const ProfileSection = () => {
       setFormData({ name: user.name || '', email: user.email || '', password: '' });
     }
   }, [user]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSuccess('');
-    
-    if (!formData.name || !formData.email) {
-      return;
-    }
-    
-    if (formData.password && formData.password.length < 6) {
-      return;
-    }
-    
-    try {
-      const updatedData = { name: formData.name, email: formData.email };
-      if (formData.password) {
-        // In real app, password would be handled securely
-        updatedData.passwordChanged = true;
-      }
-      
-      await updateProfile(updatedData);
-      setIsEditing(false);
-      setSuccess('Profile updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (error) {
-      setError('Failed to update profile');
-    }
-  };
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -1534,99 +1502,27 @@ const ProfileSection = () => {
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">{user.name}</h3>
                 <p className="text-gray-600 dark:text-gray-400">{user.email}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 capitalize">{user.role} Account</p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                  Member since {new Date(user.createdAt).toLocaleDateString()}
-                </p>
-                {user.lastLogin && (
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                    Last login: {new Date(user.lastLogin).toLocaleDateString()}
-                  </p>
-                )}
               </div>
             </div>
 
             <div className="lg:col-span-2">
-              {isEditing ? (
-                <form onSubmit={handleSubmit}>
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name *</label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email *</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                        required
-                      />
-                    </div>
-                    <div className="relative">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">New Password</label>
-                      <input
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                        placeholder="Leave blank to keep current password"
-                        minLength="6"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Minimum 6 characters</p>
-                    </div>
-                    <div className="flex space-x-4">
-                      <button
-                        type="submit"
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-                      >
-                        Save Changes
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-500 px-6 py-2 rounded-lg font-semibold transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Personal Information</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Full Name</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{user.name}</span>
                   </div>
-                </form>
-              ) : (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Personal Information</h3>
-                  <div className="space-y-4">
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400">Full Name</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{user.name}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400">Email</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400">Account Type</span>
-                      <span className="font-medium text-gray-900 dark:text-white capitalize">{user.role}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-gray-600 dark:text-gray-400">Member Since</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{new Date(user.createdAt).toLocaleDateString()}</span>
-                    </div>
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Email</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
                   </div>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition-colors"
-                  >
-                    Edit Profile
-                  </button>
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Account Type</span>
+                    <span className="font-medium text-gray-900 dark:text-white capitalize">{user.role}</span>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -2576,13 +2472,12 @@ const App = () => {
         <CoordinatorsSection />
         
         {user && <ProfileSection />}
-        {user && <CertificateSection />}
         {user && user.role === 'admin' && <AdminDashboard />}
         
         {!user && (
           <section className="py-20 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-blue-950">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-8">Join CODVIX CLUB</h2>
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-8">Join CODIVIX CLUB</h2>
               <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
                 Be part of the most exciting tech event of the year. Register now to participate in competitions, workshops, and exhibitions.
               </p>
@@ -2609,7 +2504,7 @@ const App = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
-              <h3 className="text-2xl font-bold mb-4">CODVIX CLUB</h3>
+              <h3 className="text-2xl font-bold mb-4">CODIVIX CLUB</h3>
               <p className="text-gray-300 mb-4">
                 The premier tech event organized by the AI & ML Department. Join us for an unforgettable experience 
                 filled with innovation, competition, and learning.
@@ -2647,13 +2542,13 @@ const App = () => {
                 <p>AI & ML Department</p>
                 <p>College of Engineering</p>
                 <p>City, State 12345</p>
-                <p>contact@codvix.edu</p>
+                <p>contact@codivix.edu</p>
                 <p>+91 1234567890</p>
               </div>
             </div>
           </div>
           <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; CODVIX CLUB. All rights reserved. Organized by AI & ML Department.</p>
+            <p>&copy; CODIVIX CLUB. All rights reserved. Organized by AI & ML Department.</p>
           </div>
         </div>
       </footer>
@@ -2663,7 +2558,7 @@ const App = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Login to CODVIX CLUB</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Login to CODIVIX CLUB</h3>
               <button
                 onClick={() => document.getElementById('login-modal').classList.add('hidden')}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -2683,7 +2578,7 @@ const App = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Register for CODVIX CLUB</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Register for CODIVIX CLUB</h3>
               <button
                 onClick={() => document.getElementById('register-modal').classList.add('hidden')}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
