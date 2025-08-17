@@ -3,8 +3,8 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 
 // Import Firebase modules
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, getDoc } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -37,10 +37,10 @@ const DataProvider = ({ children }) => {
   const [activityLogs, setActivityLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Set up real-time listeners with error handling
+  // Set up real-time listeners with proper error handling
   useEffect(() => {
     const unsubscribeEvents = onSnapshot(
-      collection(db, 'events'), 
+      collection(db, 'events'),
       (snapshot) => {
         const eventData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -49,12 +49,12 @@ const DataProvider = ({ children }) => {
         setEvents(eventData);
       },
       (error) => {
-        console.error('Error fetching events:', error);
+        console.error('Error listening to events:', error);
       }
     );
 
     const unsubscribeRegistrations = onSnapshot(
-      collection(db, 'registrations'), 
+      collection(db, 'registrations'),
       (snapshot) => {
         const registrationData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -63,12 +63,12 @@ const DataProvider = ({ children }) => {
         setRegistrations(registrationData);
       },
       (error) => {
-        console.error('Error fetching registrations:', error);
+        console.error('Error listening to registrations:', error);
       }
     );
 
     const unsubscribeAnnouncements = onSnapshot(
-      collection(db, 'announcements'), 
+      collection(db, 'announcements'),
       (snapshot) => {
         const announcementData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -77,12 +77,12 @@ const DataProvider = ({ children }) => {
         setAnnouncements(announcementData);
       },
       (error) => {
-        console.error('Error fetching announcements:', error);
+        console.error('Error listening to announcements:', error);
       }
     );
 
     const unsubscribeCoordinators = onSnapshot(
-      collection(db, 'coordinators'), 
+      collection(db, 'coordinators'),
       (snapshot) => {
         const coordinatorData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -91,12 +91,12 @@ const DataProvider = ({ children }) => {
         setCoordinators(coordinatorData);
       },
       (error) => {
-        console.error('Error fetching coordinators:', error);
+        console.error('Error listening to coordinators:', error);
       }
     );
 
     const unsubscribeCertificates = onSnapshot(
-      collection(db, 'certificates'), 
+      collection(db, 'certificates'),
       (snapshot) => {
         const certificateData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -105,12 +105,12 @@ const DataProvider = ({ children }) => {
         setCertificates(certificateData);
       },
       (error) => {
-        console.error('Error fetching certificates:', error);
+        console.error('Error listening to certificates:', error);
       }
     );
 
     const unsubscribeActivityLogs = onSnapshot(
-      collection(db, 'activityLogs'), 
+      query(collection(db, 'activityLogs'), orderBy('timestamp', 'desc')),
       (snapshot) => {
         const logData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -119,7 +119,7 @@ const DataProvider = ({ children }) => {
         setActivityLogs(logData);
       },
       (error) => {
-        console.error('Error fetching activity logs:', error);
+        console.error('Error listening to activity logs:', error);
       }
     );
 
@@ -218,39 +218,269 @@ const DataProvider = ({ children }) => {
         console.error('Error initializing data:', error);
         setLoading(false);
       }
-
-      // Cleanup function
-      return () => {
-        unsubscribeEvents();
-        unsubscribeRegistrations();
-        unsubscribeAnnouncements();
-        unsubscribeCoordinators();
-        unsubscribeCertificates();
-        unsubscribeActivityLogs();
-      };
     };
 
     initializeData();
+
+    // Cleanup function
+    return () => {
+      unsubscribeEvents();
+      unsubscribeRegistrations();
+      unsubscribeAnnouncements();
+      unsubscribeCoordinators();
+      unsubscribeCertificates();
+      unsubscribeActivityLogs();
+    };
   }, []);
 
-  const registerForEvent = async (userId, eventId, registrationData) => {
+  // CRUD Operations for Events
+  const addEvent = async (eventData) => {
     try {
-      // Check if already registered
-      const q = query(collection(db, 'registrations'), where('userId', '==', userId), where('eventId', '==', eventId));
-      const querySnapshot = await getDocs(q);
+      const newEvent = {
+        ...eventData,
+        registeredCount: 0,
+        createdAt: new Date().toISOString()
+      };
       
-      if (!querySnapshot.empty) {
-        throw new Error('You are already registered for this event');
-      }
-
-      // Check if event has available slots
-      const eventDoc = await getDoc(doc(db, 'events', eventId));
-      const event = eventDoc.data();
+      const docRef = await addDoc(collection(db, 'events'), newEvent);
       
-      if (event && event.registeredCount >= event.maxParticipants) {
-        throw new Error('This event is full');
-      }
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'event_added',
+        userId: 'admin',
+        details: {
+          eventId: docRef.id,
+          eventName: eventData.title
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+      return { id: docRef.id, ...newEvent };
+    } catch (error) {
+      console.error('Error adding event:', error);
+      throw error;
+    }
+  };
 
+  const updateEvent = async (eventId, eventData) => {
+    try {
+      const eventRef = doc(db, 'events', eventId);
+      await updateDoc(eventRef, eventData);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'event_updated',
+        userId: 'admin',
+        details: {
+          eventId: eventId,
+          eventName: eventData.title
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating event:', error);
+      throw error;
+    }
+  };
+
+  const deleteEvent = async (eventId) => {
+    try {
+      // Get event details before deletion
+      const eventDoc = await getDocs(query(collection(db, 'events'), where('id', '==', eventId)));
+      const event = eventDoc.docs[0]?.data();
+      
+      const eventRef = doc(db, 'events', eventId);
+      await deleteDoc(eventRef);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'event_deleted',
+        userId: 'admin',
+        details: {
+          eventId: eventId,
+          eventName: event?.title
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      throw error;
+    }
+  };
+
+  // CRUD Operations for Announcements
+  const addAnnouncement = async (announcementData) => {
+    try {
+      const newAnnouncement = {
+        ...announcementData,
+        date: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toISOString()
+      };
+      
+      const docRef = await addDoc(collection(db, 'announcements'), newAnnouncement);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'announcement_added',
+        userId: 'admin',
+        details: {
+          announcementId: docRef.id,
+          message: announcementData.message
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+      return { id: docRef.id, ...newAnnouncement };
+    } catch (error) {
+      console.error('Error adding announcement:', error);
+      throw error;
+    }
+  };
+
+  // CRUD Operations for Coordinators
+  const addCoordinator = async (coordinatorData) => {
+    try {
+      const newCoordinator = {
+        ...coordinatorData,
+        photo: coordinatorData.photo || `https://placehold.co/150x150/${Math.floor(Math.random()*16777215).toString(16)}/ffffff?text=${coordinatorData.name.charAt(0)}`
+      };
+      
+      const docRef = await addDoc(collection(db, 'coordinators'), newCoordinator);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'coordinator_added',
+        userId: 'admin',
+        details: {
+          coordinatorId: docRef.id,
+          name: coordinatorData.name
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+      return { id: docRef.id, ...newCoordinator };
+    } catch (error) {
+      console.error('Error adding coordinator:', error);
+      throw error;
+    }
+  };
+
+  const updateCoordinator = async (coordinatorId, coordinatorData) => {
+    try {
+      const coordinatorRef = doc(db, 'coordinators', coordinatorId);
+      await updateDoc(coordinatorRef, coordinatorData);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'coordinator_updated',
+        userId: 'admin',
+        details: {
+          coordinatorId: coordinatorId,
+          name: coordinatorData.name
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating coordinator:', error);
+      throw error;
+    }
+  };
+
+  const deleteCoordinator = async (coordinatorId) => {
+    try {
+      // Get coordinator details before deletion
+      const coordinatorDoc = await getDocs(query(collection(db, 'coordinators'), where('id', '==', coordinatorId)));
+      const coordinator = coordinatorDoc.docs[0]?.data();
+      
+      const coordinatorRef = doc(db, 'coordinators', coordinatorId);
+      await deleteDoc(coordinatorRef);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'coordinator_deleted',
+        userId: 'admin',
+        details: {
+          coordinatorId: coordinatorId,
+          name: coordinator?.name
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error deleting coordinator:', error);
+      throw error;
+    }
+  };
+
+  // CRUD Operations for Certificates
+  const issueCertificate = async (certificateData) => {
+    try {
+      const newCertificate = {
+        ...certificateData,
+        issuedAt: new Date().toISOString(),
+        status: 'issued',
+        certificateUrl: `https://codivixclub.com/certificates/${certificateData.eventId}/${certificateData.userId}`
+      };
+      
+      const docRef = await addDoc(collection(db, 'certificates'), newCertificate);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'certificate_issued',
+        userId: 'admin',
+        details: {
+          certificateId: docRef.id,
+          eventId: certificateData.eventId,
+          userId: certificateData.userId,
+          eventName: certificateData.eventName
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+      return { id: docRef.id, ...newCertificate };
+    } catch (error) {
+      console.error('Error issuing certificate:', error);
+      throw error;
+    }
+  };
+
+  const updateCertificateStatus = async (certificateId, status) => {
+    try {
+      const certificateRef = doc(db, 'certificates', certificateId);
+      await updateDoc(certificateRef, { status: status });
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'certificate_status_updated',
+        userId: 'admin',
+        details: {
+          certificateId: certificateId,
+          status: status
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating certificate status:', error);
+      throw error;
+    }
+  };
+
+  const registerForEvent = async (userId, eventId, registrationData) => {
+    // Check if already registered
+    const existingRegistration = registrations.find(
+      reg => reg.userId === userId && reg.eventId === eventId
+    );
+    
+    if (existingRegistration) {
+      throw new Error('You are already registered for this event');
+    }
+
+    // Check if event has available slots
+    const event = events.find(e => e.id === eventId);
+    if (event && event.registeredCount >= event.maxParticipants) {
+      throw new Error('This event is full');
+    }
+
+    try {
       const newRegistration = {
         userId,
         eventId,
@@ -263,8 +493,21 @@ const DataProvider = ({ children }) => {
       const docRef = await addDoc(collection(db, 'registrations'), newRegistration);
       
       // Update event registration count
-      await updateDoc(doc(db, 'events', eventId), {
+      const eventRef = doc(db, 'events', eventId);
+      await updateDoc(eventRef, {
         registeredCount: event.registeredCount + 1
+      });
+
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'event_registration',
+        userId: userId,
+        details: {
+          eventId: eventId,
+          eventName: event.title,
+          registrationId: docRef.id
+        },
+        timestamp: new Date().toISOString()
       });
 
       return { id: docRef.id, ...newRegistration };
@@ -302,6 +545,15 @@ const DataProvider = ({ children }) => {
     getUserRegistrations,
     getEventRegistrations,
     getAllData,
+    addEvent,
+    updateEvent,
+    deleteEvent,
+    addAnnouncement,
+    addCoordinator,
+    updateCoordinator,
+    deleteCoordinator,
+    issueCertificate,
+    updateCertificateStatus,
     loading
   };
 
@@ -322,17 +574,21 @@ const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // For now, assume all users are students
+          // Get user claims to check admin status
+          const idTokenResult = await firebaseUser.getIdTokenResult();
+          const isAdmin = idTokenResult.claims.admin || false;
+          
           const userData = {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-            role: 'student'
+            role: isAdmin ? 'admin' : 'student'
           };
           
           setUser(userData);
         } catch (error) {
           console.error('Error getting user claims:', error);
+          // Even if claims fail, we can still set up the user
           const userData = {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
@@ -361,8 +617,14 @@ const AuthProvider = ({ children }) => {
       
       console.log('User signed in:', firebaseUser.uid);
       
+      // Get user claims to check admin status
+      const idTokenResult = await firebaseUser.getIdTokenResult();
+      const isAdmin = idTokenResult.claims.admin || false;
+      
+      console.log('User is admin:', isAdmin);
+      
       // For admin users, verify the secret code
-      if (email.includes('admin') && secretCode !== 'CODIVIX2025') {
+      if (isAdmin && secretCode !== 'CODIVIX2025') {
         throw new Error('Invalid admin credentials');
       }
       
@@ -370,7 +632,7 @@ const AuthProvider = ({ children }) => {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-        role: email.includes('admin') ? 'admin' : 'student'
+        role: isAdmin ? 'admin' : 'student'
       };
       
       setUser(userData);
@@ -415,69 +677,6 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register function
-  const register = async ({ name, email, password, role = 'student' }) => {
-    try {
-      console.log('Attempting registration with:', email);
-      
-      // Create user with Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
-      
-      console.log('User registered:', firebaseUser.uid);
-      
-      // Create user profile in Firestore
-      const userData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        name: name,
-        role: role,
-        createdAt: new Date().toISOString()
-      };
-      
-      // Store user data (optional - you can skip this if you don't need additional user data)
-      // await addDoc(collection(db, 'users'), userData);
-      
-      // Set the user in state
-      setUser({
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        name: name,
-        role: role
-      });
-      
-      console.log('Registration successful:', userData);
-      
-      return userData;
-    } catch (error) {
-      console.error('Registration error details:', error);
-      
-      let errorMessage = 'Registration failed';
-      
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = 'An account with this email already exists';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Invalid email address';
-          break;
-        case 'auth/weak-password':
-          errorMessage = 'Password is too weak. Please use at least 6 characters';
-          break;
-        case 'auth/operation-not-allowed':
-          errorMessage = 'Registration is currently disabled. Please contact the administrator.';
-          break;
-        case 'auth/network-request-failed':
-          errorMessage = 'Network error. Please check your internet connection.';
-          break;
-        default:
-          errorMessage = error.message || 'Registration failed';
-      }
-      
-      throw new Error(errorMessage);
-    }
-  };
-
   // Logout function
   const logout = async () => {
     try {
@@ -492,7 +691,6 @@ const AuthProvider = ({ children }) => {
   const value = {
     user,
     login,
-    register,
     logout,
     loading
   };
@@ -784,6 +982,16 @@ const CertificateSection = () => {
 const EventCard = ({ event, onRegister }) => {
   const { user } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const { getUserRegistrations } = useData();
+
+  useEffect(() => {
+    if (user && event) {
+      const userRegs = getUserRegistrations(user.uid);
+      const isReg = userRegs.some(reg => reg.eventId === event.id);
+      setIsRegistered(isReg);
+    }
+  }, [user, event, getUserRegistrations]);
 
   return (
     <div 
@@ -800,6 +1008,11 @@ const EventCard = ({ event, onRegister }) => {
         <div className="absolute top-4 right-4 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs font-semibold">
           {event.category}
         </div>
+        {isRegistered && (
+          <div className="absolute top-4 left-4 bg-green-500 text-white px-2 py-1 rounded text-xs font-semibold">
+            Registered
+          </div>
+        )}
       </div>
       <div className="p-6">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{event.title}</h3>
@@ -839,14 +1052,14 @@ const EventCard = ({ event, onRegister }) => {
           </div>
           <button
             onClick={() => onRegister(event)}
-            disabled={!user}
+            disabled={!user || isRegistered}
             className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-              user 
+              user && !isRegistered
                 ? 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105' 
                 : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
             }`}
           >
-            {user ? 'Register' : 'Login to Register'}
+            {user ? (isRegistered ? 'Registered' : 'Register') : 'Login to Register'}
           </button>
         </div>
       </div>
@@ -1543,7 +1756,9 @@ const AdminDashboard = () => {
     addCoordinator, 
     updateCoordinator, 
     deleteCoordinator,
-    activityLogs
+    activityLogs,
+    issueCertificate,
+    updateCertificateStatus
   } = useData();
   
   const [activeTab, setActiveTab] = useState('events');
@@ -1552,7 +1767,15 @@ const AdminDashboard = () => {
   const [showEventForm, setShowEventForm] = useState(false);
   const [showCoordinatorForm, setShowCoordinatorForm] = useState(false);
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
+  const [showCertificateForm, setShowCertificateForm] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({ message: '', urgent: false });
+  const [certificateForm, setCertificateForm] = useState({
+    userId: '',
+    eventId: '',
+    eventName: '',
+    userId: '',
+    userName: ''
+  });
   
   if (!user || user.role !== 'admin') return null;
 
@@ -1947,6 +2170,97 @@ const AdminDashboard = () => {
     );
   };
 
+  const CertificateForm = ({ onSubmit, onCancel }) => {
+    const [formData, setFormData] = useState(certificateForm);
+
+    const handleChange = (e) => {
+      const { name, value } = e.target;
+      setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await issueCertificate(formData);
+        setShowCertificateForm(false);
+        setCertificateForm({ userId: '', eventId: '', eventName: '', userName: '' });
+      } catch (error) {
+        console.error('Error issuing certificate:', error);
+      }
+    };
+
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Issue Certificate</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User ID *</label>
+            <input
+              type="text"
+              name="userId"
+              value={formData.userId}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Enter user ID"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User Name *</label>
+            <input
+              type="text"
+              name="userName"
+              value={formData.userName}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Enter user name"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event ID *</label>
+            <input
+              type="text"
+              name="eventId"
+              value={formData.eventId}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Enter event ID"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Name *</label>
+            <input
+              type="text"
+              name="eventName"
+              value={formData.eventName}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Enter event name"
+              required
+            />
+          </div>
+          <div className="flex space-x-4 pt-4">
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+            >
+              Issue Certificate
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-500 px-6 py-2 rounded-lg font-semibold transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
   const AdminContent = () => {
     switch (activeTab) {
       case 'events':
@@ -1955,7 +2269,10 @@ const AdminDashboard = () => {
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Manage Events</h3>
               <button
-                onClick={() => setShowEventForm(true)}
+                onClick={() => {
+                  setEditingEvent(null);
+                  setShowEventForm(true);
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
               >
                 Add New Event
@@ -2080,7 +2397,10 @@ const AdminDashboard = () => {
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Manage Coordinators</h3>
               <button
-                onClick={() => setShowCoordinatorForm(true)}
+                onClick={() => {
+                  setEditingCoordinator(null);
+                  setShowCoordinatorForm(true);
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
               >
                 Add Coordinator
@@ -2289,44 +2609,56 @@ const AdminDashboard = () => {
       case 'certificates':
         return (
           <div className="space-y-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Certificate Management</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h4 className="font-bold text-gray-900 dark:text-white mb-4">Upload Certificate Template</h4>
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 10h-1m-5.9-5a4 4 0 010 8H9" />
-                  </svg>
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Drag and drop PDF file here, or click to select</p>
-                  <button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
-                    Choose File
-                  </button>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h4 className="font-bold text-gray-900 dark:text-white mb-4">Issue Certificates</h4>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Event</label>
-                    <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white">
-                      <option>Select an event</option>
-                      {events.map(event => (
-                        <option key={event.id} value={event.id}>{event.title}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Participants</label>
-                    <select multiple className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-32">
-                      <option value="1">John Doe (john.doe@college.edu)</option>
-                      <option value="2">Jane Smith (jane.smith@college.edu)</option>
-                    </select>
-                  </div>
-                  <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition-colors">
-                    Issue Certificates
-                  </button>
-                </div>
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Certificate Management</h3>
+              <button
+                onClick={() => setShowCertificateForm(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+              >
+                Issue Certificate
+              </button>
+            </div>
+            
+            {showCertificateForm ? (
+              <CertificateForm
+                onSubmit={(data) => {
+                  issueCertificate(data);
+                  setShowCertificateForm(false);
+                  setCertificateForm({ userId: '', eventId: '', eventName: '', userName: '' });
+                }}
+                onCancel={() => {
+                  setShowCertificateForm(false);
+                  setCertificateForm({ userId: '', eventId: '', eventName: '', userName: '' });
+                }}
+              />
+            ) : null}
+            
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Recent Certificates</h3>
+              <div className="space-y-3">
+                {activityLogs
+                  .filter(log => log.action === 'certificate_issued')
+                  .slice(-5)
+                  .map(log => (
+                    <div key={log.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-gray-900 dark:text-white">Certificate for {log.details.userName}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Event: {log.details.eventName}</p>
+                        </div>
+                        <div className="flex space-x-2 ml-4">
+                          <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm">Download</button>
+                          <button className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm">Revoke</button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">{new Date(log.timestamp).toLocaleString()}</span>
+                        <span className="text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded">
+                          Issued
+                        </span>
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           </div>
