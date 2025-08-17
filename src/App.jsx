@@ -1773,11 +1773,6 @@ const ProfileSection = () => {
       await updateProfile(user.uid, formData);
       setSuccess('Profile updated successfully!');
       
-      // Update local user state
-      const updatedUser = { ...user, name: formData.name };
-      // In a real app, you would update the user context
-      // setUser(updatedUser);
-      
       setTimeout(() => {
         setIsEditing(false);
       }, 2000);
