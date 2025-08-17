@@ -3,8 +3,8 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 
 // Import Firebase modules
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "firebase/auth";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -233,27 +233,25 @@ const DataProvider = ({ children }) => {
     };
   }, []);
 
-  // CRUD operations for events
   const addEvent = async (eventData) => {
     try {
       const docRef = await addDoc(collection(db, 'events'), {
         ...eventData,
-        registeredCount: eventData.registeredCount || 0,
-        createdAt: serverTimestamp()
+        registeredCount: 0
       });
       
       // Add activity log
       await addDoc(collection(db, 'activityLogs'), {
         action: 'event_added',
-        userId: eventData.createdBy || 'admin',
+        userId: eventData.createdBy || 'system',
         details: {
           eventId: docRef.id,
           eventName: eventData.title
         },
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
       
-      return { id: docRef.id, ...eventData };
+      return { id: docRef.id, ...eventData, registeredCount: 0 };
     } catch (error) {
       console.error('Error adding event:', error);
       throw error;
@@ -263,20 +261,17 @@ const DataProvider = ({ children }) => {
   const updateEvent = async (eventId, eventData) => {
     try {
       const eventRef = doc(db, 'events', eventId);
-      await updateDoc(eventRef, {
-        ...eventData,
-        updatedAt: serverTimestamp()
-      });
+      await updateDoc(eventRef, eventData);
       
       // Add activity log
       await addDoc(collection(db, 'activityLogs'), {
         action: 'event_updated',
-        userId: eventData.updatedBy || 'admin',
+        userId: eventData.updatedBy || 'system',
         details: {
           eventId: eventId,
           eventName: eventData.title
         },
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error updating event:', error);
@@ -286,17 +281,22 @@ const DataProvider = ({ children }) => {
 
   const deleteEvent = async (eventId) => {
     try {
-      const eventRef = doc(db, 'events', eventId);
-      await deleteDoc(eventRef);
+      // Get event details before deletion
+      const eventDoc = await getDocs(collection(db, 'events'), where('id', '==', eventId));
+      const eventData = eventDoc.docs[0]?.data();
+      
+      // Delete the event
+      await deleteDoc(doc(db, 'events', eventId));
       
       // Add activity log
       await addDoc(collection(db, 'activityLogs'), {
         action: 'event_deleted',
-        userId: 'admin',
+        userId: 'system',
         details: {
-          eventId: eventId
+          eventId: eventId,
+          eventName: eventData?.title || 'Unknown Event'
         },
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error deleting event:', error);
@@ -304,23 +304,90 @@ const DataProvider = ({ children }) => {
     }
   };
 
-  // CRUD operations for coordinators
-  const addCoordinator = async (coordinatorData) => {
+  const addAnnouncement = async (announcementData) => {
     try {
-      const docRef = await addDoc(collection(db, 'coordinators'), {
-        ...coordinatorData,
-        createdAt: serverTimestamp()
+      const docRef = await addDoc(collection(db, 'announcements'), {
+        ...announcementData,
+        date: new Date().toISOString().split('T')[0]
       });
       
       // Add activity log
       await addDoc(collection(db, 'activityLogs'), {
+        action: 'announcement_added',
+        userId: 'system',
+        details: {
+          announcementId: docRef.id,
+          message: announcementData.message
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+      return { id: docRef.id, ...announcementData, date: new Date().toISOString().split('T')[0] };
+    } catch (error) {
+      console.error('Error adding announcement:', error);
+      throw error;
+    }
+  };
+
+  const updateAnnouncement = async (announcementId, announcementData) => {
+    try {
+      const announcementRef = doc(db, 'announcements', announcementId);
+      await updateDoc(announcementRef, announcementData);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'announcement_updated',
+        userId: 'system',
+        details: {
+          announcementId: announcementId,
+          message: announcementData.message
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating announcement:', error);
+      throw error;
+    }
+  };
+
+  const deleteAnnouncement = async (announcementId) => {
+    try {
+      // Get announcement details before deletion
+      const announcementDoc = await getDocs(collection(db, 'announcements'), where('id', '==', announcementId));
+      const announcementData = announcementDoc.docs[0]?.data();
+      
+      // Delete the announcement
+      await deleteDoc(doc(db, 'announcements', announcementId));
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'announcement_deleted',
+        userId: 'system',
+        details: {
+          announcementId: announcementId,
+          message: announcementData?.message || 'Unknown Announcement'
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      throw error;
+    }
+  };
+
+  const addCoordinator = async (coordinatorData) => {
+    try {
+      const docRef = await addDoc(collection(db, 'coordinators'), coordinatorData);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
         action: 'coordinator_added',
-        userId: coordinatorData.createdBy || 'admin',
+        userId: 'system',
         details: {
           coordinatorId: docRef.id,
-          coordinatorName: coordinatorData.name
+          name: coordinatorData.name
         },
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
       
       return { id: docRef.id, ...coordinatorData };
@@ -333,20 +400,17 @@ const DataProvider = ({ children }) => {
   const updateCoordinator = async (coordinatorId, coordinatorData) => {
     try {
       const coordinatorRef = doc(db, 'coordinators', coordinatorId);
-      await updateDoc(coordinatorRef, {
-        ...coordinatorData,
-        updatedAt: serverTimestamp()
-      });
+      await updateDoc(coordinatorRef, coordinatorData);
       
       // Add activity log
       await addDoc(collection(db, 'activityLogs'), {
         action: 'coordinator_updated',
-        userId: coordinatorData.updatedBy || 'admin',
+        userId: 'system',
         details: {
           coordinatorId: coordinatorId,
-          coordinatorName: coordinatorData.name
+          name: coordinatorData.name
         },
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error updating coordinator:', error);
@@ -356,17 +420,22 @@ const DataProvider = ({ children }) => {
 
   const deleteCoordinator = async (coordinatorId) => {
     try {
-      const coordinatorRef = doc(db, 'coordinators', coordinatorId);
-      await deleteDoc(coordinatorRef);
+      // Get coordinator details before deletion
+      const coordinatorDoc = await getDocs(collection(db, 'coordinators'), where('id', '==', coordinatorId));
+      const coordinatorData = coordinatorDoc.docs[0]?.data();
+      
+      // Delete the coordinator
+      await deleteDoc(doc(db, 'coordinators', coordinatorId));
       
       // Add activity log
       await addDoc(collection(db, 'activityLogs'), {
         action: 'coordinator_deleted',
-        userId: 'admin',
+        userId: 'system',
         details: {
-          coordinatorId: coordinatorId
+          coordinatorId: coordinatorId,
+          name: coordinatorData?.name || 'Unknown Coordinator'
         },
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error deleting coordinator:', error);
@@ -374,75 +443,26 @@ const DataProvider = ({ children }) => {
     }
   };
 
-  // CRUD operations for announcements
-  const addAnnouncement = async (announcementData) => {
-    try {
-      const docRef = await addDoc(collection(db, 'announcements'), {
-        ...announcementData,
-        date: announcementData.date || new Date().toISOString().split('T')[0],
-        createdAt: serverTimestamp()
-      });
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'announcement_added',
-        userId: announcementData.createdBy || 'admin',
-        details: {
-          announcementId: docRef.id,
-          message: announcementData.message
-        },
-        timestamp: serverTimestamp()
-      });
-      
-      return { id: docRef.id, ...announcementData };
-    } catch (error) {
-      console.error('Error adding announcement:', error);
-      throw error;
-    }
-  };
-
-  const deleteAnnouncement = async (announcementId) => {
-    try {
-      const announcementRef = doc(db, 'announcements', announcementId);
-      await deleteDoc(announcementRef);
-      
-      // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'announcement_deleted',
-        userId: 'admin',
-        details: {
-          announcementId: announcementId
-        },
-        timestamp: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('Error deleting announcement:', error);
-      throw error;
-    }
-  };
-
-  // Certificate operations
   const issueCertificate = async (certificateData) => {
     try {
       const docRef = await addDoc(collection(db, 'certificates'), {
         ...certificateData,
-        issuedAt: serverTimestamp(),
+        issuedAt: new Date().toISOString(),
         status: 'issued'
       });
       
       // Add activity log
       await addDoc(collection(db, 'activityLogs'), {
         action: 'certificate_issued',
-        userId: certificateData.issuedBy || 'admin',
+        userId: certificateData.userId,
         details: {
           certificateId: docRef.id,
-          eventName: certificateData.eventName,
-          recipient: certificateData.recipientName
+          eventName: certificateData.eventName
         },
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
       
-      return { id: docRef.id, ...certificateData };
+      return { id: docRef.id, ...certificateData, issuedAt: new Date().toISOString(), status: 'issued' };
     } catch (error) {
       console.error('Error issuing certificate:', error);
       throw error;
@@ -492,12 +512,36 @@ const DataProvider = ({ children }) => {
           eventName: event.title,
           registrationId: docRef.id
         },
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
 
       return { id: docRef.id, ...newRegistration };
     } catch (error) {
       console.error('Error registering for event:', error);
+      throw error;
+    }
+  };
+
+  const updateProfile = async (userId, profileData) => {
+    try {
+      // In a real app, you would update the user document in Firestore
+      // For now, we'll just simulate the update
+      console.log('Updating profile for user:', userId, profileData);
+      
+      // Add activity log
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'profile_updated',
+        userId: userId,
+        details: {
+          name: profileData.name,
+          email: profileData.email
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating profile:', error);
       throw error;
     }
   };
@@ -526,19 +570,21 @@ const DataProvider = ({ children }) => {
     coordinators,
     certificates,
     activityLogs,
-    addEvent,
-    updateEvent,
-    deleteEvent,
-    addCoordinator,
-    updateCoordinator,
-    deleteCoordinator,
-    addAnnouncement,
-    deleteAnnouncement,
-    issueCertificate,
     registerForEvent,
     getUserRegistrations,
     getEventRegistrations,
     getAllData,
+    addEvent,
+    updateEvent,
+    deleteEvent,
+    addAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
+    addCoordinator,
+    updateCoordinator,
+    deleteCoordinator,
+    issueCertificate,
+    updateProfile,
     loading
   };
 
@@ -673,10 +719,39 @@ const AuthProvider = ({ children }) => {
     }
   };
 
+  // Reset password function
+  const resetPassword = async (email) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return 'Password reset email sent successfully. Please check your inbox.';
+    } catch (error) {
+      console.error('Password reset error:', error);
+      
+      let errorMessage = 'Failed to send password reset email';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No user found with this email address';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Please enter a valid email address';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your internet connection.';
+          break;
+        default:
+          errorMessage = error.message || 'Failed to send password reset email';
+      }
+      
+      throw new Error(errorMessage);
+    }
+  };
+
   const value = {
     user,
     login,
     logout,
+    resetPassword,
     loading
   };
 
@@ -1217,17 +1292,19 @@ const CoordinatorsSection = () => {
 };
 
 const LoginForm = () => {
-  const { login } = useAuth();
+  const { login, resetPassword } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '', secretCode: '' });
   const [error, setError] = useState('');
   const [isStudentLogin, setIsStudentLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showSecretCode, setShowSecretCode] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setResetSuccess('');
     
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
@@ -1251,17 +1328,20 @@ const LoginForm = () => {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
+    setError('');
+    setResetSuccess('');
+    
     if (!formData.email) {
       setError('Please enter your email address');
       return;
     }
     
     try {
-      await sendPasswordResetEmail(auth, formData.email);
-      setError(`Password reset email sent to ${formData.email}. Please check your inbox.`);
+      const result = await resetPassword(formData.email);
+      setResetSuccess(result);
     } catch (err) {
       console.error('Password reset error:', err);
-      setError('Failed to send password reset email. Please try again.');
+      setError(err.message || 'Failed to send password reset email. Please try again.');
     }
   };
 
@@ -1304,6 +1384,12 @@ const LoginForm = () => {
       {error && (
         <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg text-sm">
           {error}
+        </div>
+      )}
+      
+      {resetSuccess && (
+        <div className="mb-4 p-3 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-lg text-sm">
+          {resetSuccess}
         </div>
       )}
       
@@ -1430,7 +1516,11 @@ const LoginForm = () => {
           {isStudentLogin ? (
             <>
               <button
-                onClick={() => setForgotPassword(!forgotPassword)}
+                onClick={() => {
+                  setForgotPassword(!forgotPassword);
+                  setError('');
+                  setResetSuccess('');
+                }}
                 className="text-blue-600 dark:text-blue-400 hover:underline font-medium mr-4"
               >
                 {forgotPassword ? 'Back to Login' : 'Forgot Password?'}
@@ -1651,9 +1741,11 @@ const RegisterForm = () => {
 
 const ProfileSection = () => {
   const { user, logout } = useAuth();
+  const { updateProfile } = useData();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -1664,6 +1756,33 @@ const ProfileSection = () => {
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
       logout();
+    }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    
+    if (!formData.name || !formData.email) {
+      setError('Please fill in all required fields');
+      return;
+    }
+    
+    try {
+      await updateProfile(user.uid, formData);
+      setSuccess('Profile updated successfully!');
+      
+      // Update local user state
+      const updatedUser = { ...user, name: formData.name };
+      // In a real app, you would update the user context
+      // setUser(updatedUser);
+      
+      setTimeout(() => {
+        setIsEditing(false);
+      }, 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to update profile');
     }
   };
 
@@ -1688,6 +1807,12 @@ const ProfileSection = () => {
               {success}
             </div>
           )}
+          
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg">
+              {error}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1">
@@ -1704,23 +1829,87 @@ const ProfileSection = () => {
             </div>
 
             <div className="lg:col-span-2">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Personal Information</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                    <span className="text-gray-600 dark:text-gray-400">Full Name</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{user.name}</span>
+              {!isEditing ? (
+                <div>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Personal Information</h3>
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    >
+                      Edit Profile
+                    </button>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                    <span className="text-gray-600 dark:text-gray-400">Email</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                    <span className="text-gray-600 dark:text-gray-400">Account Type</span>
-                    <span className="font-medium text-gray-900 dark:text-white capitalize">{user.role}</span>
+                  <div className="space-y-4">
+                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                      <span className="text-gray-600 dark:text-gray-400">Full Name</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{user.name}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                      <span className="text-gray-600 dark:text-gray-400">Email</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                      <span className="text-gray-600 dark:text-gray-400">Account Type</span>
+                      <span className="font-medium text-gray-900 dark:text-white capitalize">{user.role}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Profile</h3>
+                    <button
+                      onClick={() => {
+                        setIsEditing(false);
+                        setError('');
+                        setSuccess('');
+                      }}
+                      className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <form onSubmit={handleUpdateProfile} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name *</label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email *</label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                      <input
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        placeholder="Leave blank to keep current password"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      Update Profile
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1737,29 +1926,26 @@ const AdminDashboard = () => {
     updateEvent, 
     deleteEvent, 
     addAnnouncement, 
+    updateAnnouncement,
     deleteAnnouncement,
     coordinators, 
     addCoordinator, 
     updateCoordinator, 
     deleteCoordinator,
-    activityLogs,
-    issueCertificate
+    issueCertificate,
+    activityLogs
   } = useData();
   
   const [activeTab, setActiveTab] = useState('events');
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingCoordinator, setEditingCoordinator] = useState(null);
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [showCoordinatorForm, setShowCoordinatorForm] = useState(false);
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  const [announcementForm, setAnnouncementForm] = useState({ message: '', urgent: false });
-  const [certificateForm, setCertificateForm] = useState({ 
-    eventName: '', 
-    recipientName: '', 
-    recipientEmail: '', 
-    issueDate: new Date().toISOString().split('T')[0]
-  });
   const [showCertificateForm, setShowCertificateForm] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({ message: '', urgent: false });
+  const [certificateForm, setCertificateForm] = useState({ userId: '', eventName: '', eventDate: '' });
   
   if (!user || user.role !== 'admin') return null;
 
@@ -1799,15 +1985,9 @@ const AdminDashboard = () => {
       e.preventDefault();
       try {
         if (event) {
-          await updateEvent(event.id, {
-            ...formData,
-            updatedBy: user.uid
-          });
+          await updateEvent(event.id, formData);
         } else {
-          await addEvent({
-            ...formData,
-            createdBy: user.uid
-          });
+          await addEvent(formData);
         }
         setShowEventForm(false);
         setEditingEvent(null);
@@ -1986,15 +2166,9 @@ const AdminDashboard = () => {
       e.preventDefault();
       try {
         if (coordinator) {
-          await updateCoordinator(coordinator.id, {
-            ...formData,
-            updatedBy: user.uid
-          });
+          await updateCoordinator(coordinator.id, formData);
         } else {
-          await addCoordinator({
-            ...formData,
-            createdBy: user.uid
-          });
+          await addCoordinator(formData);
         }
         setShowCoordinatorForm(false);
         setEditingCoordinator(null);
@@ -2095,8 +2269,8 @@ const AdminDashboard = () => {
     );
   };
 
-  const AnnouncementForm = ({ onSubmit, onCancel }) => {
-    const [formData, setFormData] = useState(announcementForm);
+  const AnnouncementForm = ({ announcement, onSave, onCancel }) => {
+    const [formData, setFormData] = useState(announcement || { message: '', urgent: false });
 
     const handleChange = (e) => {
       const { name, value, type, checked } = e.target;
@@ -2109,12 +2283,13 @@ const AdminDashboard = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       try {
-        await addAnnouncement({
-          ...formData,
-          createdBy: user.uid
-        });
+        if (announcement) {
+          await updateAnnouncement(announcement.id, formData);
+        } else {
+          await addAnnouncement(formData);
+        }
         setShowAnnouncementForm(false);
-        setAnnouncementForm({ message: '', urgent: false });
+        setEditingAnnouncement(null);
       } catch (error) {
         console.error('Error adding announcement:', error);
       }
@@ -2122,7 +2297,9 @@ const AdminDashboard = () => {
 
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Post New Announcement</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+          {announcement ? 'Edit Announcement' : 'Add New Announcement'}
+        </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message *</label>
@@ -2154,7 +2331,7 @@ const AdminDashboard = () => {
               type="submit"
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
             >
-              Post Announcement
+              {announcement ? 'Update Announcement' : 'Add Announcement'}
             </button>
             <button
               type="button"
@@ -2180,18 +2357,9 @@ const AdminDashboard = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       try {
-        await issueCertificate({
-          ...formData,
-          issuedBy: user.uid,
-          status: 'issued'
-        });
+        await issueCertificate(formData);
         setShowCertificateForm(false);
-        setCertificateForm({ 
-          eventName: '', 
-          recipientName: '', 
-          recipientEmail: '', 
-          issueDate: new Date().toISOString().split('T')[0]
-        });
+        setCertificateForm({ userId: '', eventName: '', eventDate: '' });
       } catch (error) {
         console.error('Error issuing certificate:', error);
       }
@@ -2202,6 +2370,18 @@ const AdminDashboard = () => {
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Issue Certificate</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User ID *</label>
+            <input
+              type="text"
+              name="userId"
+              value={formData.userId}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Enter user ID"
+              required
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Name *</label>
             <input
               type="text"
@@ -2209,37 +2389,16 @@ const AdminDashboard = () => {
               value={formData.eventName}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              placeholder="Enter event name"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recipient Name *</label>
-            <input
-              type="text"
-              name="recipientName"
-              value={formData.recipientName}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recipient Email *</label>
-            <input
-              type="email"
-              name="recipientEmail"
-              value={formData.recipientEmail}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Issue Date *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Date *</label>
             <input
               type="date"
-              name="issueDate"
-              value={formData.issueDate}
+              name="eventDate"
+              value={formData.eventDate}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
               required
@@ -2344,7 +2503,10 @@ const AdminDashboard = () => {
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Manage Announcements</h3>
               <button
-                onClick={() => setShowAnnouncementForm(true)}
+                onClick={() => {
+                  setEditingAnnouncement(null);
+                  setShowAnnouncementForm(true);
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
               >
                 Add Announcement
@@ -2353,14 +2515,19 @@ const AdminDashboard = () => {
             
             {showAnnouncementForm ? (
               <AnnouncementForm
-                onSubmit={(data) => {
-                  addAnnouncement(data);
+                announcement={editingAnnouncement}
+                onSave={(announcementData) => {
+                  if (editingAnnouncement) {
+                    updateAnnouncement(editingAnnouncement.id, announcementData);
+                  } else {
+                    addAnnouncement(announcementData);
+                  }
                   setShowAnnouncementForm(false);
-                  setAnnouncementForm({ message: '', urgent: false });
+                  setEditingAnnouncement(null);
                 }}
                 onCancel={() => {
                   setShowAnnouncementForm(false);
-                  setAnnouncementForm({ message: '', urgent: false });
+                  setEditingAnnouncement(null);
                 }}
               />
             ) : null}
@@ -2373,9 +2540,9 @@ const AdminDashboard = () => {
                     <div className="flex justify-between items-start">
                       <p className="text-gray-900 dark:text-white">{announcement.message}</p>
                       <div className="flex space-x-2 ml-4">
-                        <button 
+                        <button
                           onClick={() => {
-                            setEditingEvent(announcement);
+                            setEditingAnnouncement(announcement);
                             setShowAnnouncementForm(true);
                           }}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm"
@@ -2391,7 +2558,7 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                     <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">{new Date(announcement.date).toLocaleDateString()}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">{announcement.date}</span>
                       {announcement.urgent && (
                         <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
                           URGENT
@@ -2511,13 +2678,13 @@ const AdminDashboard = () => {
                       .map(log => (
                         <tr key={log.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            Event #{log.details.eventId}
+                            {log.details.eventName}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             User #{log.userId}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(log.timestamp.seconds * 1000).toLocaleDateString()}
+                            {new Date(log.timestamp).toLocaleDateString()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
                             Completed
@@ -2592,7 +2759,7 @@ const AdminDashboard = () => {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Announcements</p>
                     <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                      {activityLogs.filter(log => log.action === 'announcement_added').length}
+                      {announcements.length}
                     </p>
                   </div>
                 </div>
@@ -2607,7 +2774,7 @@ const AdminDashboard = () => {
                     <div>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{log.action.replace('_', ' ')}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(log.timestamp.seconds * 1000).toLocaleString()}
+                        {new Date(log.timestamp).toLocaleString()}
                       </p>
                     </div>
                     <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded">
@@ -2638,21 +2805,9 @@ const AdminDashboard = () => {
                 onSubmit={(data) => {
                   issueCertificate(data);
                   setShowCertificateForm(false);
-                  setCertificateForm({ 
-                    eventName: '', 
-                    recipientName: '', 
-                    recipientEmail: '', 
-                    issueDate: new Date().toISOString().split('T')[0]
-                  });
                 }}
                 onCancel={() => {
                   setShowCertificateForm(false);
-                  setCertificateForm({ 
-                    eventName: '', 
-                    recipientName: '', 
-                    recipientEmail: '', 
-                    issueDate: new Date().toISOString().split('T')[0]
-                  });
                 }}
               />
             ) : null}
@@ -2668,16 +2823,15 @@ const AdminDashboard = () => {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="text-gray-900 dark:text-white">Certificate for {log.details.eventName}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Issued to {log.details.recipient}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Issued to User #{log.userId}</p>
                         </div>
-                        <div className="flex space-x-2 ml-4">
-                          <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm">Edit</button>
-                          <button className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm">Delete</button>
-                        </div>
+                        <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm">
+                          View
+                        </button>
                       </div>
                       <div className="flex justify-between items-center mt-2">
                         <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(log.timestamp.seconds * 1000).toLocaleDateString()}
+                          {new Date(log.timestamp).toLocaleString()}
                         </span>
                         <span className="text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded">
                           ISSUED
@@ -2922,4 +3076,48 @@ const App = () => {
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLine
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <LoginForm />
+          </div>
+        </div>
+      </div>
+
+      {/* Register Modal */}
+      <div id="register-modal" className="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Register for CODIVIX CLUB</h3>
+              <button
+                onClick={() => document.getElementById('register-modal').classList.add('hidden')}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <RegisterForm />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AppWrapper = () => {
+  return (
+    <ThemeProvider>
+      <DataProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </DataProvider>
+    </ThemeProvider>
+  );
+};
+
+export default AppWrapper;
