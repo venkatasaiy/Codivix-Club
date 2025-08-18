@@ -1,9 +1,17 @@
 // App.jsx
 import React, { useState, useEffect, createContext, useContext } from 'react';
 
-// Import Firebase modules
+// Import Firebase modules with proper error handling
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "firebase/auth";
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  onAuthStateChanged, 
+  signOut, 
+  sendPasswordResetEmail,
+  createUserWithEmailAndPassword,
+  updateProfile as firebaseUpdateProfile
+} from "firebase/auth";
 import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
@@ -17,10 +25,19 @@ const firebaseConfig = {
   measurementId: "G-7RC1PVBBW2"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialize Firebase with proper error handling
+let app;
+let auth;
+let db;
+
+try {
+  // Check if Firebase is already initialized
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+}
 
 // Contexts
 const AuthContext = createContext();
@@ -43,15 +60,26 @@ const DataProvider = ({ children }) => {
         unsubscribeCoordinators, unsubscribeCertificates, unsubscribeActivityLogs;
 
     try {
+      // Validate Firebase initialization
+      if (!db) {
+        console.error('Firebase Firestore not initialized');
+        setLoading(false);
+        return;
+      }
+
       // Set up all listeners
       unsubscribeEvents = onSnapshot(
         collection(db, 'events'),
         (snapshot) => {
-          const eventData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setEvents(eventData);
+          try {
+            const eventData = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setEvents(eventData);
+          } catch (error) {
+            console.error('Error processing events:', error);
+          }
         },
         (error) => {
           console.error('Error listening to events:', error);
@@ -61,11 +89,15 @@ const DataProvider = ({ children }) => {
       unsubscribeRegistrations = onSnapshot(
         collection(db, 'registrations'),
         (snapshot) => {
-          const registrationData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setRegistrations(registrationData);
+          try {
+            const registrationData = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setRegistrations(registrationData);
+          } catch (error) {
+            console.error('Error processing registrations:', error);
+          }
         },
         (error) => {
           console.error('Error listening to registrations:', error);
@@ -75,11 +107,15 @@ const DataProvider = ({ children }) => {
       unsubscribeAnnouncements = onSnapshot(
         collection(db, 'announcements'),
         (snapshot) => {
-          const announcementData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setAnnouncements(announcementData);
+          try {
+            const announcementData = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setAnnouncements(announcementData);
+          } catch (error) {
+            console.error('Error processing announcements:', error);
+          }
         },
         (error) => {
           console.error('Error listening to announcements:', error);
@@ -89,11 +125,15 @@ const DataProvider = ({ children }) => {
       unsubscribeCoordinators = onSnapshot(
         collection(db, 'coordinators'),
         (snapshot) => {
-          const coordinatorData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setCoordinators(coordinatorData);
+          try {
+            const coordinatorData = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setCoordinators(coordinatorData);
+          } catch (error) {
+            console.error('Error processing coordinators:', error);
+          }
         },
         (error) => {
           console.error('Error listening to coordinators:', error);
@@ -103,11 +143,15 @@ const DataProvider = ({ children }) => {
       unsubscribeCertificates = onSnapshot(
         collection(db, 'certificates'),
         (snapshot) => {
-          const certificateData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setCertificates(certificateData);
+          try {
+            const certificateData = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setCertificates(certificateData);
+          } catch (error) {
+            console.error('Error processing certificates:', error);
+          }
         },
         (error) => {
           console.error('Error listening to certificates:', error);
@@ -117,11 +161,15 @@ const DataProvider = ({ children }) => {
       unsubscribeActivityLogs = onSnapshot(
         query(collection(db, 'activityLogs'), orderBy('timestamp', 'desc')),
         (snapshot) => {
-          const logData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setActivityLogs(logData);
+          try {
+            const logData = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            setActivityLogs(logData);
+          } catch (error) {
+            console.error('Error processing activity logs:', error);
+          }
         },
         (error) => {
           console.error('Error listening to activity logs:', error);
@@ -131,6 +179,13 @@ const DataProvider = ({ children }) => {
       // Initialize with sample data if empty
       const initializeData = async () => {
         try {
+          // Validate Firestore
+          if (!db) {
+            console.error('Firestore not available');
+            setLoading(false);
+            return;
+          }
+
           const eventsSnapshot = await getDocs(collection(db, 'events'));
           if (eventsSnapshot.empty) {
             const initialEvents = [
@@ -245,6 +300,11 @@ const DataProvider = ({ children }) => {
   // CRUD operations with proper error handling
   const addEvent = async (eventData) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       const docRef = await addDoc(collection(db, 'events'), {
         ...eventData,
         registeredCount: 0
@@ -270,6 +330,11 @@ const DataProvider = ({ children }) => {
 
   const updateEvent = async (eventId, eventData) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       const eventRef = doc(db, 'events', eventId);
       await updateDoc(eventRef, eventData);
       
@@ -291,6 +356,11 @@ const DataProvider = ({ children }) => {
 
   const deleteEvent = async (eventId) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       // Get event details before deletion
       const eventQuery = query(collection(db, 'events'), where('id', '==', eventId));
       const eventSnapshot = await getDocs(eventQuery);
@@ -317,6 +387,11 @@ const DataProvider = ({ children }) => {
 
   const addAnnouncement = async (announcementData) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       const docRef = await addDoc(collection(db, 'announcements'), {
         ...announcementData,
         date: new Date().toISOString().split('T')[0]
@@ -342,6 +417,11 @@ const DataProvider = ({ children }) => {
 
   const updateAnnouncement = async (announcementId, announcementData) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       const announcementRef = doc(db, 'announcements', announcementId);
       await updateDoc(announcementRef, announcementData);
       
@@ -363,6 +443,11 @@ const DataProvider = ({ children }) => {
 
   const deleteAnnouncement = async (announcementId) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       // Get announcement details before deletion
       const announcementQuery = query(collection(db, 'announcements'), where('id', '==', announcementId));
       const announcementSnapshot = await getDocs(announcementQuery);
@@ -389,6 +474,11 @@ const DataProvider = ({ children }) => {
 
   const addCoordinator = async (coordinatorData) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       const docRef = await addDoc(collection(db, 'coordinators'), coordinatorData);
       
       // Add activity log
@@ -411,6 +501,11 @@ const DataProvider = ({ children }) => {
 
   const updateCoordinator = async (coordinatorId, coordinatorData) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       const coordinatorRef = doc(db, 'coordinators', coordinatorId);
       await updateDoc(coordinatorRef, coordinatorData);
       
@@ -432,6 +527,11 @@ const DataProvider = ({ children }) => {
 
   const deleteCoordinator = async (coordinatorId) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       // Get coordinator details before deletion
       const coordinatorQuery = query(collection(db, 'coordinators'), where('id', '==', coordinatorId));
       const coordinatorSnapshot = await getDocs(coordinatorQuery);
@@ -458,6 +558,11 @@ const DataProvider = ({ children }) => {
 
   const issueCertificate = async (certificateData) => {
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       const docRef = await addDoc(collection(db, 'certificates'), {
         ...certificateData,
         issuedAt: new Date().toISOString(),
@@ -499,6 +604,11 @@ const DataProvider = ({ children }) => {
     }
 
     try {
+      // Validate Firestore
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
       const newRegistration = {
         userId,
         eventId,
@@ -542,15 +652,17 @@ const DataProvider = ({ children }) => {
       console.log('Updating profile for user:', userId, profileData);
       
       // Add activity log
-      await addDoc(collection(db, 'activityLogs'), {
-        action: 'profile_updated',
-        userId: userId,
-        details: {
-          name: profileData.name,
-          email: profileData.email
-        },
-        timestamp: new Date().toISOString()
-      });
+      if (db) {
+        await addDoc(collection(db, 'activityLogs'), {
+          action: 'profile_updated',
+          userId: userId,
+          details: {
+            name: profileData.name,
+            email: profileData.email
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
       
       return true;
     } catch (error) {
@@ -614,6 +726,13 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Validate Firebase initialization
+    if (!auth) {
+      console.error('Firebase Auth not initialized');
+      setLoading(false);
+      return;
+    }
+
     // Listen for authentication state changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -653,6 +772,11 @@ const AuthProvider = ({ children }) => {
   // Login function with improved error handling
   const login = async (email, password, secretCode = null) => {
     try {
+      // Validate Firebase Auth
+      if (!auth) {
+        throw new Error('Firebase Auth not initialized');
+      }
+      
       console.log('Attempting login with:', email);
       
       // Sign in with Firebase Authentication
@@ -724,6 +848,11 @@ const AuthProvider = ({ children }) => {
   // Logout function
   const logout = async () => {
     try {
+      // Validate Firebase Auth
+      if (!auth) {
+        throw new Error('Firebase Auth not initialized');
+      }
+      
       await signOut(auth);
       setUser(null);
     } catch (error) {
@@ -735,6 +864,11 @@ const AuthProvider = ({ children }) => {
   // Reset password function
   const resetPassword = async (email) => {
     try {
+      // Validate Firebase Auth
+      if (!auth) {
+        throw new Error('Firebase Auth not initialized');
+      }
+      
       if (!email) {
         throw new Error('Email address is required');
       }
@@ -764,11 +898,81 @@ const AuthProvider = ({ children }) => {
     }
   };
 
+  // Register function (added)
+  const register = async ({ name, email, password, role = 'student' }) => {
+    try {
+      // Validate Firebase Auth
+      if (!auth) {
+        throw new Error('Firebase Auth not initialized');
+      }
+      
+      // Create user with email and password
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      // Set displayName on Firebase user
+      try {
+        await firebaseUpdateProfile(firebaseUser, { displayName: name });
+      } catch (e) {
+        console.warn('Failed to update displayName:', e);
+      }
+
+      // Create a basic user document + activity log
+      if (db) {
+        await addDoc(collection(db, 'users'), {
+          uid: firebaseUser.uid,
+          name,
+          email,
+          role,
+          createdAt: new Date().toISOString()
+        });
+
+        await addDoc(collection(db, 'activityLogs'), {
+          action: 'user_registered',
+          userId: firebaseUser.uid,
+          details: { name, email, role },
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const userData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name,
+        role
+      };
+
+      setUser(userData);
+      return userData;
+    } catch (error) {
+      console.error('Registration error:', error);
+      let errorMessage = 'Registration failed';
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'Email is already in use';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password is too weak';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your internet connection.';
+          break;
+        default:
+          errorMessage = error.message || 'Registration failed';
+      }
+      throw new Error(errorMessage);
+    }
+  };
+
   const value = {
     user,
     login,
     logout,
     resetPassword,
+    register,
     loading
   };
 
@@ -3036,7 +3240,7 @@ const App = () => {
               <div className="flex space-x-4">
                 <a href="#" className="text-gray-300 hover:text-white transition-colors">
                   <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
+                    <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.38-.83.5-1.75.85-2.72 1.05C18.37 4.5 17.26 4 16 4c-2.35 0-4.27 1.92-4.27 4.29 0 .34.04.67.11.98C8.28 9.09 5.11 7.38 3 4.79c-.37.63-.58 1.37-.58 2.15 0 1.49.75 2.81 1.91 3.56-.71 0-1.37-.2-1.95-.5v.03c0 2.08 1.48 3.82 3.44 4.21a4.22 4.22 0 0 1-1.93.07 4.28 4.28 0 0 0 4 2.98 8.521 8.521 0 0 1-5.33 1.84c-.34 0-.68-.02-1.02-.06C3.44 20.29 5.7 21 8.12 21 16 21 20.33 14.46 20.33 8.79c0-.19 0-.37-.01-.56.84-.6 1.56-1.36 2.14-2.23z"/>
                   </svg>
                 </a>
                 <a href="#" className="text-gray-300 hover:text-white transition-colors">
