@@ -3268,10 +3268,9 @@ const App = () => {
               <h4 className="text-lg font-semibold mb-4">Contact</h4>
               <div className="space-y-2 text-gray-300">
                 <p>AI & ML Department</p>
-                <p>College of Engineering</p>
-                <p>City, State 12345</p>
-                <p>contact@codivix.edu</p>
-                <p>+91 1234567890</p>
+                <p>PBR Visvodaya Institute of Technology and Science</p>
+                <p>Udayagiri Road, Kavali, SPSR Nellore District, 524201</p>
+                <p>codivixpbrvits@gmail.com</p>
               </div>
             </div>
           </div>
